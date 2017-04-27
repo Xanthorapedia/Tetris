@@ -44,7 +44,7 @@ public:
 	u128 wAr, swA;
 
 	// shifted working area
-	u128 sfA[8];
+	u128 sfA[8] = { 0 };
 
 	// lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11
 	static const u128 LBDRY, UBDRY, nROW1, nROW10;
@@ -53,10 +53,9 @@ public:
 	static const u128 TMNO[7][4];
 
 	// directions to shift the field
-	static const enum shift {R, RU, U, LU, L, LD, D, RD};
+	enum shift {R, RU, U, LU, L, LD, D, RD};
 
-	//static const enum TMO {L0, L1, L2, L3, J0, J1, J2, J3, S0, S1, S2, S3, 
-	//	Z0, Z1, Z2, Z3, T0, T1, T2, T3, L0, L1, L2, L3, O0};
+	enum TMO { L0, L1, L2, L3, J0, J1, J2, J3, S0, S1, Z0, Z1, T0, T1, T2, T3, I3, I4, O0 };
 
 	static inline int getPiece(const u128* board, int x, int y);
 
@@ -67,6 +66,9 @@ public:
 
 	// gets the shifted working area
 	inline u128 getShift(shift ori);
+
+	// gets possible positions of center of a type of tetrimino
+	inline u128 cenPos(TMO);
 };
 
 int main() {
@@ -90,9 +92,9 @@ int main() {
 	//	//system("cls");
 	//}
 
-	brd.wAr = (Board::TMNO[0][10] | Board::TMNO[0][8] << 41);
+	brd.wAr = (Board::TMNO[0][1] >> 12 | Board::TMNO[0][10] | Board::TMNO[0][8] << 41);
 	brd.sanctify();
-	u128 arr[2]{ brd.getShift(brd.LD), brd.swA };
+	u128 arr[2]{ brd.cenPos(Board::J1), brd.swA };
 	brd.printBoard(arr, NULL, NULL);
 	cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << ~0x0400400400400400ull << "ull";
 	std::cin.get();
@@ -144,7 +146,7 @@ void Board::printBoard(const u128* board, const char table0[H][W], const char ta
 				if (table1 != NULL && table1[x] != NULL)
 					str = str + table1[x][y] + table1[x][y];
 				else
-					str = "##";
+					str = "█";                                                        //changed   sssssssssssssssssssssssssssss
 			else
 				if (table0 != NULL && table0[x] != NULL)
 					str = str + table0[x][y] + table0[x][y];
@@ -188,4 +190,52 @@ inline u128 Board::getShift(shift ori) {
 		break;
 	}
 	return sfA[ori];
+}
+
+/* gets possible positions of center of a type of tetrimino */
+inline u128 Board::cenPos(TMO type) {
+	register u128 raw = swA;
+	switch (type) {
+	case Board::L0:	raw &= getShift(L) & getShift(R) & getShift(RU);
+		break;
+	case Board::L1:	raw &= getShift(U) & getShift(D) & getShift(LU);
+		break;
+	case Board::L2:	raw &= getShift(L) & getShift(R) & getShift(LD);
+		break;
+	case Board::L3:	raw &= getShift(U) & getShift(D) & getShift(RD);
+		break;
+	case Board::J0:	raw &= getShift(L) & getShift(R) & getShift(LU);
+		break;
+	case Board::J1:	raw &= getShift(U) & getShift(D) & getShift(LD);
+		break;
+	case Board::J2:	raw &= getShift(L) & getShift(R) & getShift(RD);
+		break;
+	case Board::J3:	raw &= getShift(U) & getShift(D) & getShift(RU);
+		break;
+	case Board::S0:	raw &= getShift(U) & getShift(L) & getShift(RU);
+		break;
+	case Board::S1:	raw &= getShift(D) & getShift(L) & getShift(LU);
+		break;
+	case Board::Z0:	raw &= getShift(U) & getShift(R) & getShift(LU);
+		break;
+	case Board::Z1:	raw &= getShift(U) & getShift(L) & getShift(LD);
+		break;
+	case Board::T0:	raw &= getShift(L) & getShift(R) & getShift(D);
+		break;
+	case Board::T1:	raw &= getShift(U) & getShift(D) & getShift(R);
+		break;
+	case Board::T2:	raw &= getShift(L) & getShift(R) & getShift(U);
+		break;
+	case Board::T3:	raw &= getShift(U) & getShift(D) & getShift(L);
+		break;
+	case Board::I3:	raw &= getShift(U) & getShift(D) & U(getShift(U)) & nROW1;
+		break;
+	case Board::I4:	raw &= getShift(L) & getShift(R) & L(getShift(L));
+		break;
+	case Board::O0:	raw &= getShift(D) & getShift(R) & getShift(RD);
+		break;
+	default:
+		break;
+	}
+	return raw & (raw ^ U(raw));
 }

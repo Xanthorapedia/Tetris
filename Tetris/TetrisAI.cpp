@@ -46,8 +46,8 @@ public:
 	// shifted working area
 	u128 sfA[8] = { 0 };
 
-	// lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11
-	static const u128 LBDRY, UBDRY, nROW1, nROW10;
+	// lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11, half of the field without boundaries
+	static const u128 LBDRY, UBDRY, nROW1, nROW10, HLF;
 
 	// tetrimino patterns
 	static const u128 TMNO[7][4];
@@ -59,16 +59,19 @@ public:
 
 	static inline int getPiece(const u128* board, int x, int y);
 
-	static void printBoard(const u128* board, const char table0[H][W], const char table1[H][W]);
+	// lesbian - returns the least significant bit
+	static inline u128 LSB(register u128 num);
+
+	static void printBoard(const u128* board0, const u128* board1);
 
 	// sanctify the working area (fill holes) and put into swA
 	inline void sanctify();
 
 	// gets the shifted working area
-	inline u128 getShift(shift ori);
+	u128 getShift(shift ori);
 
 	// gets possible positions of center of a type of tetrimino
-	inline u128 cenPos(TMO);
+	u128 cenPos(TMO);
 };
 
 int main() {
@@ -80,23 +83,32 @@ int main() {
 	a = 0x000000400c008000ull << 1;
 	u128 b = brd.UBDRY;
 	
-	////u128 arr[2]{ a, 0 };
-	//for (int i = 0; i < 28; i++) {
-	//	if (Board::TMNO[0][i] != (u128)0) {
-	//		brd.wAr = Board::TMNO[0][i] | Board::TMNO[0][i] << 41;
-	//		brd.sanctify();
-	//		u128 arr[2]{ brd.wAr, RD(brd.swA) };
-	//		brd.printBoard(arr, NULL, NULL);
-	//	}
-	//	
-	//	//system("cls");
-	//}
-
 	brd.wAr = (Board::TMNO[0][1] >> 12 | Board::TMNO[0][10] | Board::TMNO[0][8] << 41);
 	brd.sanctify();
-	u128 arr[2]{ brd.cenPos(Board::J1), brd.swA };
-	brd.printBoard(arr, NULL, NULL);
-	cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << ~0x0400400400400400ull << "ull";
+	u128 cen = brd.cenPos(Board::J1);
+
+	time_t time = clock();
+	for (int j = 0; j < 4E6; j++) {
+		//brd.sanctify();
+		//u128 cen = brd.cenPos(Board::J1);
+		u128 cen0 = cen;
+		for (int i = 0; cen0 != (u128)0; i++) {
+			u128 lsb = brd.LSB(cen0);
+			cen0 ^= lsb;
+			//u128 arr1[2]{ cen ^= lsb, 0 };
+			//brd.printBoard(arr1, 0);
+		}
+	}
+	cout << (float)(clock() - time) / CLOCKS_PER_SEC << std::endl;
+
+	u128 arr0[2] { cen, 0 };
+	u128 lsb = brd.LSB(brd.cenPos(Board::J1));
+	u128 arr1[2] { brd.cenPos(Board::J1) ^ lsb, 0 };
+	brd.printBoard(arr0, 0);
+
+	/*u128 full = ~(Board::UBDRY | Board::LBDRY);
+	cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << full.hi << "ull" << std::endl;
+	cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << full.lo << "ull" << std::endl;*/
 	std::cin.get();
 	return 0;
 }
@@ -107,6 +119,7 @@ const u128 Board::UBDRY = (u128)0x0001001001001001ull << 60 | 0x0001001001001001
 const u128 Board::LBDRY = (u128)0x0800800800800800ull << 60 | 0x0800800800800800ull;
 const u128 Board::nROW10 = (u128)0xdffdffdffdffdffdull << 60 | 0xdffdffdffdffdffdull;
 const u128 Board::nROW1 = (u128)0xfbffbffbffbffbffull << 60 | 0xfbffbffbffbffbffull;
+const u128 Board::HLF = (u128)0x07fe7fe7fe7fe7feull << 60 | 0xe7fe7fe7fe7fe7feull;
 
 // tetrimino patterns
 const u128 Board::TMNO[7][4] = {
@@ -129,7 +142,12 @@ inline int Board::getPiece(const u128* board, int x, int y) {
 		return (u64)((board[0] >> ((--x) * CH + 11 - y)) & 1);
 }
 
-void Board::printBoard(const u128* board, const char table0[H][W], const char table1[H][W]) {
+inline u128 Board::LSB(register u128 num) {
+	//return num & (num - (u128)1);
+	return num & -num;
+}
+
+void Board::printBoard(const u128* board0, const u128* board1) {
 	using std::cout;
 	using std::endl;
 	using std::setw;
@@ -137,21 +155,27 @@ void Board::printBoard(const u128* board, const char table0[H][W], const char ta
 
 	string str;
 	cout << "  -------------------------------" << endl;
-	for (int y = 20; y >= 1; y--) {
+	for (int y = 10; y >= 1; y--) {
 		cout << setw(2) << y << "|";
 		for (int x = 1; x <= W; x++) {
-			str = "";
-			// if has block, print char from table1 if applicable, else from table0
-			if (getPiece(board, x, y))
-				if (table1 != NULL && table1[x] != NULL)
-					str = str + table1[x][y] + table1[x][y];
+			// if the second board is unavailable, prints %% for occupied for the first board
+			// else prints @+ if the bit is occupied by both, @@ if only board0, ++ if only board1
+			if (getPiece(board0, x, y))
+				if (board1 == NULL)
+					str = "%%";
 				else
-					str = "█";                                                        //changed   sssssssssssssssssssssssssssss
+					if (getPiece(board1, x, y))
+						str = "@+";
+					else
+						str = "@@";
 			else
-				if (table0 != NULL && table0[x] != NULL)
-					str = str + table0[x][y] + table0[x][y];
-				else
+				if (board1 == NULL)
 					str = "  ";
+				else
+					if (getPiece(board1, x, y))
+						str = "+@";
+					else
+						str = "  ";
 			cout << str << "|";
 		}
 		cout << endl << "  -------------------------------" << endl;
@@ -161,12 +185,15 @@ void Board::printBoard(const u128* board, const char table0[H][W], const char ta
 
 /* fills the holes in the field */
 inline void Board::sanctify() {
+	// wAr | LBDRY to make a bottom for filling 1 (in case there is a empty column)
+	// - UBDRY propagates trailing 1 to the top of the column
 	swA = (wAr | LBDRY) - UBDRY;
-	swA &= ~wAr;
+	// ~wAr clears the original part, HLF clears the residue of UBDRY
+	swA &= (~wAr & HLF);
 }
 
 /* gets the shifted working area */
-inline u128 Board::getShift(shift ori) {
+u128 Board::getShift(shift ori) {
 	if (sfA[ori])
 		return sfA[ori];
 	switch (ori) {
@@ -193,8 +220,9 @@ inline u128 Board::getShift(shift ori) {
 }
 
 /* gets possible positions of center of a type of tetrimino */
-inline u128 Board::cenPos(TMO type) {
+u128 Board::cenPos(TMO type) {
 	register u128 raw = swA;
+
 	switch (type) {
 	case Board::L0:	raw &= getShift(L) & getShift(R) & getShift(RU);
 		break;
@@ -237,5 +265,7 @@ inline u128 Board::cenPos(TMO type) {
 	default:
 		break;
 	}
-	return raw & (raw ^ U(raw));
+
+	// moves raw upward and & with ~itself to get the lower edges of the possible position area
+	return raw & ~U(raw);
 }

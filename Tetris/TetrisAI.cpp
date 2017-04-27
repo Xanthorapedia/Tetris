@@ -87,7 +87,6 @@ int main() {
 	//		brd.printBoard(arr, NULL, NULL);
 	//	}
 	//	
-
 	//	//system("cls");
 	//}
 

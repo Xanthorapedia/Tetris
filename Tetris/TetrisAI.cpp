@@ -100,7 +100,7 @@ public:
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
 	int inline move(Board& newBoard, TMO type);
 
-	//// gets the histogram of columns
+	// gets the histogram of columns
 	void getHist();
 };
 

@@ -44,10 +44,10 @@ public:
 	u128 wAr, swA;
 
 	// shifted working area
-	u128 sfA[8] = { 0 };
+	//u128 sfA[8] = { 0 };
 
 	// the height of ten columns
-	uint8_t hist[11] = { {} };
+	uint8_t hist[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 	/*
 	lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11
@@ -55,8 +55,8 @@ public:
 	*/
 	static const u128 LBDRY, UBDRY, nROW1, nROW10, HLF, ROW[11], ELMMSK[10], nELMMSK[10];
 
-	// the rage of x of each type of tetrimino
-	static const uint8_t XRANGE[19][2];
+	// the rage of x of each type of tetrimino, index of each piece
+	static const uint8_t XRANGE[19][2], PIECE[11][11];
 
 	//static const uint32_t _1110 = 0x1110, _1100 = 0x1100, _0110 = 0x0110, _0100 = 0x;
 
@@ -84,30 +84,24 @@ public:
 	inline void sanctify();
 
 	// gets the greater number
-	inline uint8_t max(uint8_t a, uint8_t b);
-	inline uint8_t max(uint8_t a, uint8_t b, uint8_t c);
-	inline uint8_t max(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
+	inline uint8_t max(int8_t a, int8_t b);
+	inline uint8_t max(int8_t a, int8_t b, int8_t c);
+	inline uint8_t max(int8_t a, int8_t b, int8_t c, int8_t d);
 
 	// finds the possible y of a tetrimino when cetered at (x, )
 	int cenY(int x, TMO type);
 
 	// tries to eliminate y'th row of board, returns the row mask if sccess, 0 if fail
-	static inline const u128* elim(u128& board, int y, int& count);
+	static inline const void elim(u128& ori, u128& applied, u128& elim, int y, int& count);
 
 	// applies the type of tetrimino to the specified position
 	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);
 
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
-	int inline move(Board* newBoard, TMO type);
+	int inline move(Board& newBoard, TMO type);
 
 	//// gets the histogram of columns
 	void getHist();
-
-	// gets the shifted working area
-	u128 getShift(shift ori);
-
-	// gets possible positions of center of a type of tetrimino
-	u128 cenPos(TMO);
 };
 
 /* magic numbers */
@@ -124,6 +118,17 @@ const u128 Board::ROW[11] = { 0, (u128)0x0400400400400400ull << 60 | 0x040040040
 	(u128)0x0008008008008008ull << 60 | 0x8008008008008008ull, (u128)0x0004004004004004ull << 60 | 0x4004004004004004ull,
 	(u128)0x0002002002002002ull << 60 | 0x2002002002002002ull,
 };
+const uint8_t Board::PIECE[11][11] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13,
+35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25,
+47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37,
+59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49,
+71, 70, 69, 68, 67, 66, 65, 64, 63, 62, 61,
+83, 82, 81, 80, 79, 78, 77, 76, 75, 74, 73,
+95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85,
+107, 106, 105, 104, 103, 102, 101, 100, 99, 98, 97,
+119, 118, 117, 116, 115, 114, 113, 112, 111, 110, 109, };
 const u128 Board::ELMMSK[10] = {
 	HLF, U(ELMMSK[0]) & HLF, U(ELMMSK[1]) & HLF, U(ELMMSK[2]) & HLF, U(ELMMSK[3]) & HLF, U(ELMMSK[4]) & HLF,
 	U(ELMMSK[5]) & HLF, U(ELMMSK[6]) & HLF, U(ELMMSK[7]) & HLF, U(ELMMSK[8]) & HLF
@@ -224,17 +229,17 @@ inline void Board::sanctify() {
 }
 
 /* gets the greater of the two */
-inline uint8_t Board::max(uint8_t a, uint8_t b) {
+inline uint8_t Board::max(int8_t a, int8_t b) {
 	return a > b ? a : b;
 }
 
 /* gets the greater of the three */
-inline uint8_t Board::max(uint8_t a, uint8_t b, uint8_t c) {
+inline uint8_t Board::max(int8_t a, int8_t b, int8_t c) {
 	return max(max(a, b), c);
 }
 
 /* gets the greater of the four */
-inline uint8_t Board::max(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+inline uint8_t Board::max(int8_t a, int8_t b, int8_t c, int8_t d) {
 	return max(max(a, b), max(c, d));
 }
 
@@ -283,32 +288,30 @@ int Board::cenY(int x, TMO type) {
 }
 
 /* tries to eliminate y'th row of board, returns the row mask if sccess, 0 if fail */
-inline const u128* Board::elim(u128& board, int y, int& count) {
+inline const void Board::elim(u128& ori, u128& applied, u128& elim, int y, int& count) {
 	const u128* mask = ROW + y;
 
 	// if row full
-	if ((board & *mask) == *mask) {
+	if ((applied & *mask) == *mask) {
 		count++;
-		board = (board & nELMMSK[y]) | D(board & ELMMSK[y]);
-		return mask;
+		elim |= U(elim) | (ori & *mask) << (y - 1);
+		applied = (applied & nELMMSK[y]) | D(applied & ELMMSK[y]);
 	}
-	return ROW;
 }
 
 /* applies the type of tetrimino to the specified position, elm contains the eliminated rows, count is the
    number of rows eliminated*/
 void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) {
-	elm = board;
+	u128 tmp = board;
 	
 	// update board
-	int index = getIndex(x, y);
+	int index = PIECE[x][y];
 	if (index > 27)
 		board |= TMNO[type] << (index - 27);
 	else
 		board |= TMNO[type] >> (27 - index);
 	
-	// check for elimination TODO slow
-	register u128 mask = 0;
+	// check for elimination
 	switch (type) {
 		// this & below
 	case Board::L0:
@@ -318,50 +321,50 @@ void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) {
 	case Board::T1:
 	case Board::T2:
 	case Board::T3:
-		mask |= *elim(board, y, count);
-		mask |= *elim(board, y - 1, count);
+		elim(tmp, board, elm, y, count);
+		elim(tmp, board, elm, y - 1, count);
 		/*if (x == 4 && y == 2)
-			print(board);*/
+			print(elm);*/
 		break;
 		// below
 	case Board::L1:
 	case Board::J3:
 	case Board::S0:
 	case Board::Z0:
-		mask |= *elim(board, y - 1, count);
+		elim(tmp, board, elm, y - 1, count);
 		break;
 		// this
 	case Board::L2:
 	case Board::J2:
 	case Board::T0:
 	case Board::I4:
-		mask |= *elim(board, y, count);
+		elim(tmp, board, elm, y, count);
 		break;
 		// this & above & below
 	case Board::L3:
 	case Board::J1:
-		mask |= *elim(board, y + 1, count);
-		mask |= *elim(board, y, count);
-		mask |= *elim(board, y - 1, count);
+		elim(tmp, board, elm, y + 1, count);
+		elim(tmp, board, elm, y, count);
+		elim(tmp, board, elm, y - 1, count);
 		break;
 		// this & above & below & bblow
 	case Board::I3:
-		mask |= *elim(board, y + 1, count);
-		mask |= *elim(board, y, count);
-		mask |= *elim(board, y - 1, count);
-		mask |= *elim(board, y - 2, count);
+		elim(tmp, board, elm, y + 1, count);
+		elim(tmp, board, elm, y, count);
+		elim(tmp, board, elm, y - 1, count);
+		elim(tmp, board, elm, y - 2, count);
 		break;
 		// this & above
 	case Board::O0:
-		mask |= *elim(board, y + 1, count);
-		mask |= *elim(board, y, count);
+		elim(tmp, board, elm, y + 1, count);
+		elim(tmp, board, elm, y, count);
 		break;
 	default:
 		break;
 	}
-	elm &= mask;
-
+	
 	// update hist
+	y++;
 	switch (type) {
 	case Board::L0:
 	case Board::J0:
@@ -408,34 +411,28 @@ void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) {
 		h = (u64*)(void*)&hist[6];
 		*h -= 0x0000000101010101 * count;
 	}
-
-	/*print(wAr);
-	for (int i = 1; i < 11; i++)
-		std::cout << "  " << (int)hist[i];
-	std::cout << std::endl;*/
-	//u64* g = (u64*)(void*)&hist[6];
-	//std::cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << *g << std::endl;
 }
 
 /* make a move of type and store to newBoard, returns the y of next move, 0 if no more */
-int inline Board::move(Board * newBoard, TMO type) {// TODO test
+int inline Board::move(Board& newBoard, TMO type) {
 	static int prevX = 0;
 	static int prevY = 0;
 
 	// first time, don't copy, set x to new type's starting index
 	if (prevY != 0) {
-		//std::copy(this, this, newBoard);
+		newBoard = *this;
 		int count;
 		u128 elim;
-		newBoard->apply(newBoard->wAr, prevX, prevY, type, elim, count);//TODO null, count
+		newBoard.apply(newBoard.wAr, prevX, prevY, type, elim, count);//TODO null, count
+		prevX++;
+		//print(newBoard.wAr);
 	}
 	else
 		prevX = XRANGE[type][0];
-
-	while (prevX < XRANGE[type][1]) {
+	
+	while (prevX <= XRANGE[type][1]) {
 		if ((prevY = cenY(prevX, type)) < 11)
 			return prevY;
-		prevX++;
 	}
 
 	return prevY = 0;
@@ -452,88 +449,33 @@ void Board::getHist() {
 	}
 }
 
-/* gets the shifted working area */
-u128 Board::getShift(shift ori) {
-	if (sfA[ori])
-		return sfA[ori];
-	switch (ori) {
-	case Board::R:	sfA[ori] = R(swA);
-		break;
-	case Board::RU:	sfA[ori] = RU(swA) & nROW1;
-		break;
-	case Board::U:	sfA[ori] = U(swA) & nROW1;
-		break;
-	case Board::LU:	sfA[ori] = LU(swA) & nROW1;
-		break;
-	case Board::L:	sfA[ori] = L(swA);
-		break;
-	case Board::LD:	sfA[ori] = LD(swA) & nROW10;
-		break;
-	case Board::D:	sfA[ori] = D(swA) & nROW10;
-		break;
-	case Board::RD:	sfA[ori] = RD(swA) & nROW10;
-		break;
-	default:
-		break;
-	}
-	return sfA[ori];
-}
-
-/* gets possible positions of center of a type of tetrimino */
-u128 Board::cenPos(TMO type) {
-	register u128 raw = swA;
-
-	switch (type) {
-	case Board::L0:	raw &= getShift(L) & getShift(R) & getShift(RU);
-		break;
-	case Board::L1:	raw &= getShift(U) & getShift(D) & getShift(LU);
-		break;
-	case Board::L2:	raw &= getShift(L) & getShift(R) & getShift(LD);
-		break;
-	case Board::L3:	raw &= getShift(U) & getShift(D) & getShift(RD);
-		break;
-	case Board::J0:	raw &= getShift(L) & getShift(R) & getShift(LU);
-		break;
-	case Board::J1:	raw &= getShift(U) & getShift(D) & getShift(LD);
-		break;
-	case Board::J2:	raw &= getShift(L) & getShift(R) & getShift(RD);
-		break;
-	case Board::J3:	raw &= getShift(U) & getShift(D) & getShift(RU);
-		break;
-	case Board::S0:	raw &= getShift(U) & getShift(L) & getShift(RU);
-		break;
-	case Board::S1:	raw &= getShift(D) & getShift(L) & getShift(LU);
-		break;
-	case Board::Z0:	raw &= getShift(U) & getShift(R) & getShift(LU);
-		break;
-	case Board::Z1:	raw &= getShift(U) & getShift(L) & getShift(LD);
-		break;
-	case Board::T0:	raw &= getShift(L) & getShift(R) & getShift(D);
-		break;
-	case Board::T1:	raw &= getShift(U) & getShift(D) & getShift(R);
-		break;
-	case Board::T2:	raw &= getShift(L) & getShift(R) & getShift(U);
-		break;
-	case Board::T3:	raw &= getShift(U) & getShift(D) & getShift(L);
-		break;
-	case Board::I3:	raw &= getShift(U) & getShift(D) & U(getShift(U)) & nROW1;
-		break;
-	case Board::I4:	raw &= getShift(L) & getShift(R) & L(getShift(L));
-		break;
-	case Board::O0:	raw &= getShift(D) & getShift(R) & getShift(RD);
-		break;
-	default:
-		break;
-	}
-
-	// moves raw upward and & with ~itself to get the lower edges of the possible position area
-	return raw & ~U(raw);
-}
 
 void print(u128 u) {
 	u128 arr[2] = { u, 0 };
 	Board::printBoard(arr, 0);
 }
+
+void printHist(Board b) {
+	for (int i = 1; i < 11; i++)
+		std::cout << "  " << (int)b.hist[i];
+	std::cout << std::endl;
+}
+
+void printMove(Board b, Board::TMO type) {
+	Board m;
+	m.wAr = 0;
+	while (b.move(m, type)) {
+		print(m.wAr);
+	}
+	print(m.wAr);
+}
+
+int table[4][7] = {
+	0, 4,  8, 10, 12, -1, 18,
+	1, 5,  9, 11, 13, -1, -1,
+	2, 6, -1, -1, 14, 16, -1,
+	3, 7, -1, -1, 15, 17, -1,
+};
 
 void simplePlay() {
 	using std::cin;
@@ -547,29 +489,102 @@ void simplePlay() {
 	int count = 0;
 
 	brd.apply(brd.wAr, 2, 1, static_cast<enum Board::TMO>(6), elim, count);
+	//printMove(brd, Board::J1);
 	brd.apply(brd.wAr, 6, 1, static_cast<enum Board::TMO>(18), elim, count);
 	brd.apply(brd.wAr, 8, 1, static_cast<enum Board::TMO>(12), elim, count);
 	brd.apply(brd.wAr, 2, 3, static_cast<enum Board::TMO>(3), elim, count);
 	brd.apply(brd.wAr, 7, 4, static_cast<enum Board::TMO>(16), elim, count);
+	//printMove(brd, Board::J2);
 	brd.apply(brd.wAr, 10, 2, static_cast<enum Board::TMO>(13), elim, count);
+	print(brd.wAr);
 	brd.apply(brd.wAr, 4, 2, static_cast<enum Board::TMO>(13), elim, count);
 
-	print(brd.wAr);
-	if (elim != (u128)0) {
+	//print(brd.wAr);
+	/*if (elim != (u128)0) {
+		print(brd.wAr);
+		printHist(brd);
 		print(elim);
 		cout << "eliminated: " << count << std::endl;
-	}
-	return;
+	}*/
+
+	Board nb;
+	time_t time = clock();
+	for (int j = 0; j < 0; j++)
+		while (brd.move(nb, Board::J1));
+	cout << (float)(clock() - time) / CLOCKS_PER_SEC << std::endl;
+	cout << "size" << sizeof(nb) << std::endl;
+	
+	brd.wAr = 0;
+	memset(brd.hist, 1, 11);
+
 	while (true) {
-		int x, y, t;
-		
-		cin >> x >> y >> t;
-		if (t < 0)
+		print(brd.wAr);
+		char x, y, o, b;
+		cin >> x >> y >> o >> b;
+
+		if (o == 'C') {
 			brd.wAr = 0;
-		else
+			memset(brd.hist, 1, 11);
+		}
+		else {
+			switch (b) {
+			case 'l':
+			case 'L': b = 0;
+				break;
+			case 'j':
+			case 'J': b = 1;
+				break;
+			case 's':
+			case 'S': b = 2;
+				break;
+			case 'z':
+			case 'Z': b = 3;
+				break;
+			case 't':
+			case 'T': b = 4;
+				break;
+			case 'i':
+			case 'I': b = 5;
+				break;
+			case 'o':
+			case 'O': b = 6;
+				break;
+			default: b = -1;
+				break;
+			}
+
+			o -= 48;
+
+			if (o < 0 || o > 3 && (o + 48)) {
+				cout << "o out of range" << std::endl;
+				continue;
+			}
+			if (b < 0 || o > 6) {
+				cout << "b out of range" << std::endl;
+				continue;
+			}
+			int t = table[o][b];
+			if (t < 0) {
+				cout << "no such type" << std::endl;
+				continue;
+			}
+
+			if (x == y && y == '-') {
+				printMove(brd, static_cast<enum Board::TMO>(t));
+				continue;
+			}
+
+			x -= 48;
+			y -= 48;
+
+			if (brd.cenY(x, static_cast<enum Board::TMO>(t)) != y) {
+				cout << "invalid y" << std::endl;
+				continue;
+			}
+
 			brd.apply(brd.wAr, x, y, static_cast<enum Board::TMO>(t), elim, count);
-		u128 arr[2] = { brd.wAr, 0 };
-		brd.printBoard(arr, 0);
+		}
+		
 		if (elim != (u128)0) {
 			u128 arr1[2] = { elim, 0 };
 			brd.printBoard(arr1, 0);
@@ -581,7 +596,13 @@ void simplePlay() {
 
 int main() {
 	using std::cout;
-	//simplePlay();
+	/*for (int i = 0; i < 11; i++) {
+		for (int j = 0; j < 11; j++) {
+			cout << (i - 1) * CH + 11 - j << ", ";
+		}
+		cout << std::endl;
+	}*/
+	simplePlay();
 
 	Board brd;
 	u128 k;
@@ -592,7 +613,7 @@ int main() {
 	brd.getHist();
 	print(brd.wAr);
 	time_t time = clock();
-	for (int j = 0; j < 4E6; j++)
+	for (int j = 0; j < 2E6; j++)
 	for (int i = 1; i < 10; i++) {
 		brd.cenY(i, Board::J1);
 		brd.apply(brd.wAr, 5, 5, Board::J1, k, l);

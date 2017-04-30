@@ -1,0 +1,83 @@
+﻿	// gets the shifted working area
+	u128 getShift(shift ori);
+
+	// gets possible positions of center of a type of tetrimino
+	u128 cenPos(TMO);
+
+/* gets the shifted working area */
+u128 Board::getShift(shift ori) {
+	if (sfA[ori])
+		return sfA[ori];
+	switch (ori) {
+	case Board::R:	sfA[ori] = R(swA);
+		break;
+	case Board::RU:	sfA[ori] = RU(swA) & nROW1;
+		break;
+	case Board::U:	sfA[ori] = U(swA) & nROW1;
+		break;
+	case Board::LU:	sfA[ori] = LU(swA) & nROW1;
+		break;
+	case Board::L:	sfA[ori] = L(swA);
+		break;
+	case Board::LD:	sfA[ori] = LD(swA) & nROW10;
+		break;
+	case Board::D:	sfA[ori] = D(swA) & nROW10;
+		break;
+	case Board::RD:	sfA[ori] = RD(swA) & nROW10;
+		break;
+	default:
+		break;
+	}
+	return sfA[ori];
+}
+
+/* gets possible positions of center of a type of tetrimino */
+u128 Board::cenPos(TMO type) {
+	register u128 raw = swA;
+
+	switch (type) {
+	case Board::L0:	raw &= getShift(L) & getShift(R) & getShift(RU);
+		break;
+	case Board::L1:	raw &= getShift(U) & getShift(D) & getShift(LU);
+		break;
+	case Board::L2:	raw &= getShift(L) & getShift(R) & getShift(LD);
+		break;
+	case Board::L3:	raw &= getShift(U) & getShift(D) & getShift(RD);
+		break;
+	case Board::J0:	raw &= getShift(L) & getShift(R) & getShift(LU);
+		break;
+	case Board::J1:	raw &= getShift(U) & getShift(D) & getShift(LD);
+		break;
+	case Board::J2:	raw &= getShift(L) & getShift(R) & getShift(RD);
+		break;
+	case Board::J3:	raw &= getShift(U) & getShift(D) & getShift(RU);
+		break;
+	case Board::S0:	raw &= getShift(U) & getShift(L) & getShift(RU);
+		break;
+	case Board::S1:	raw &= getShift(D) & getShift(L) & getShift(LU);
+		break;
+	case Board::Z0:	raw &= getShift(U) & getShift(R) & getShift(LU);
+		break;
+	case Board::Z1:	raw &= getShift(U) & getShift(L) & getShift(LD);
+		break;
+	case Board::T0:	raw &= getShift(L) & getShift(R) & getShift(D);
+		break;
+	case Board::T1:	raw &= getShift(U) & getShift(D) & getShift(R);
+		break;
+	case Board::T2:	raw &= getShift(L) & getShift(R) & getShift(U);
+		break;
+	case Board::T3:	raw &= getShift(U) & getShift(D) & getShift(L);
+		break;
+	case Board::I3:	raw &= getShift(U) & getShift(D) & U(getShift(U)) & nROW1;
+		break;
+	case Board::I4:	raw &= getShift(L) & getShift(R) & L(getShift(L));
+		break;
+	case Board::O0:	raw &= getShift(D) & getShift(R) & getShift(RD);
+		break;
+	default:
+		break;
+	}
+
+	// moves raw upward and & with ~itself to get the lower edges of the possible position area
+	return raw & ~U(raw);
+}

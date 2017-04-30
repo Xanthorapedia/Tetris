@@ -424,6 +424,7 @@ int inline Board::move(Board& newBoard, TMO type) {
 		int count;
 		u128 elim;
 		newBoard.apply(newBoard.wAr, prevX, prevY, type, elim, count);//TODO null, count
+		count = 0;
 		prevX++;
 		//print(newBoard.wAr);
 	}
@@ -516,10 +517,13 @@ void simplePlay() {
 	
 	brd.wAr = 0;
 	memset(brd.hist, 1, 11);
+	elim = 0;
+	count = 0;
 
 	while (true) {
 		print(brd.wAr);
-		char x, y, o, b;
+		int x, y;
+		char o, b;
 		cin >> x >> y >> o >> b;
 
 		if (o == 'C') {
@@ -569,26 +573,32 @@ void simplePlay() {
 				continue;
 			}
 
-			if (x == y && y == '-') {
-				printMove(brd, static_cast<enum Board::TMO>(t));
+			Board::TMO type = static_cast<enum Board::TMO>(t);
+
+			if (x == y && y == -1) {
+				printMove(brd, type);
 				continue;
 			}
 
-			x -= 48;
-			y -= 48;
-
-			if (brd.cenY(x, static_cast<enum Board::TMO>(t)) != y) {
+			if (brd.cenY(x, type) != y) {
 				cout << "invalid y" << std::endl;
 				continue;
 			}
 
-			brd.apply(brd.wAr, x, y, static_cast<enum Board::TMO>(t), elim, count);
+			if (x < Board::XRANGE[type][0] || x > Board::XRANGE[type][1]) {
+				cout << "invalid x" << std::endl;
+				continue;
+			}
+
+
+			brd.apply(brd.wAr, x, y, type, elim, count);
 		}
 		
 		if (elim != (u128)0) {
-			u128 arr1[2] = { elim, 0 };
-			brd.printBoard(arr1, 0);
+			print(elim);
 			cout << "eliminated: " << count << std::endl;
+			elim = 0;
+			count = 0;
 		}
 		//brd.wAr = 0;
 	}

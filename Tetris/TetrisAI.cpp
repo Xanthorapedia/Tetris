@@ -22,6 +22,8 @@ typedef uint64_t u64;
 #define W 10
 #define CH 12
 
+#define DEPTH 3
+
 #define U(x) ((x) >> 1)
 #define LU(x) ((x) >> 13)
 #define L(x) ((x) >> 12)
@@ -97,11 +99,40 @@ public:
 	// applies the type of tetrimino to the specified position
 	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);
 
+	int prevX;
+	int inline hasNext(TMO type);
+
+	void inline nextMove(Board& newBoard, TMO type);
+
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
 	int inline move(Board& newBoard, TMO type);
 
+	float eval();
+
 	////// gets the histogram of columns
 	void getHist();
+};
+
+class Simulator {
+public:
+
+	Board board;
+
+	uint8_t moveCounter = 0;
+
+	uint8_t typeCount[7] = { 4, 4, 2, 2, 4, 2, 1 };
+
+	// giver's tetrimino statistics
+	uint8_t tStat[7] = { 2, 2, 2, 2, 2, 2, 2 };
+	Board::TMO types[7] = { Board::L0, Board::J0, Board::S0, Board::Z0, Board::T0, Board::I3, Board::O0 };
+
+	Board::TMO feed();
+	void updateFeed(int type);
+
+	int dropBlock(Board&, Board::TMO type);
+
+	// next tetrimino to place
+	Board::TMO nextBlock;
 };
 
 /* magic numbers */
@@ -301,7 +332,7 @@ inline const void Board::elim(u128& ori, u128& applied, u128& elim, int y, int& 
 
 /* applies the type of tetrimino to the specified position, elm contains the eliminated rows, count is the
    number of rows eliminated*/
-void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) {
+void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) { // TODO load from field if depleted
 	u128 tmp = board;
 	
 	// update board
@@ -413,9 +444,33 @@ void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) {
 	}
 }
 
+/* determines if there is a next move for this type, returns y of next move */
+int inline Board::hasNext(TMO type) {
+	int y;
+	while (prevX <= XRANGE[type][1]) {
+		if ((y = cenY(prevX, type)) < 11)
+			return y;
+		prevX++;
+	}
+	prevX = XRANGE[type][0];
+	return 0;
+}
+
+/* makes next move of type to newBoard */
+inline void Board::nextMove(Board & newBoard, TMO type) {
+	int y = hasNext(type);
+	if (y) {
+		newBoard = *this;
+		int count;
+		u128 elim;
+		newBoard.apply(newBoard.wAr, prevX++, y, type, elim, count);//TODO null, count
+		count = 0;
+	}
+}
+
 /* make a move of type and store to newBoard, returns the y of next move, 0 if no more */
 int inline Board::move(Board& newBoard, TMO type) {
-	static int prevX = 0;
+	static int prevX = 0;// TODO change to instance variable
 	static int prevY = 0;
 
 	// first time, don't copy, set x to new type's starting index
@@ -437,6 +492,10 @@ int inline Board::move(Board& newBoard, TMO type) {
 	}
 
 	return prevY = 0;
+}
+
+float Board::eval() {//TODO
+	return 0.0f;
 }
 
 ///* gets the histogram of columns */
@@ -637,3 +696,68 @@ int main() {
 	std::cin.get();
 	return 0;
 }
+
+Board::TMO Simulator::feed() {
+	while (moveCounter < 7) {
+		if (tStat[moveCounter])
+			return types[moveCounter++];
+	}
+
+	return Board::L3;
+}
+
+void Simulator::updateFeed(int type) {
+	// all used up, fill up
+	if (*((u64*)(void*)tStat) == 0 || *((u64*)(void*)tStat) == 0x0001010101010101)
+		*((u64*)(void*)tStat) = 0x0002020202020202;
+	tStat[type]--;
+}
+
+int Simulator::dropBlock(Board& board, Board::TMO type) {
+	while (moveCounter < 7) {
+		int ret = board.move(board, (Board::TMO)(type + moveCounter));
+		//if (ret == 0)
+	}
+	
+	return 0;
+}
+
+float negaMax(Simulator& sim, int depth, float alpha, float beta, int player) {
+	if (depth == 0)
+		return sim.board.eval();
+
+	Simulator newSim = sim;
+	float best = -1;// TODO negative inf
+
+	// feeder moves
+	if (player == 1) {
+		while (sim.feed() != Board::L3) {
+			newSim = sim;
+			newSim.updateFeed(sim.moveCounter - 1);
+
+			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
+			best = (score > best ? score : best);
+			alpha = (alpha > best ? alpha : best);
+			if (alpha > beta)
+				break;
+		}
+	}
+	// droper moves
+	else {//TODO orientation
+		int nextY = sim.board.hasNext(sim.nextBlock);
+		// die
+		if (nextY == 0)
+			return -1;// TODO negative inf
+		//TODO move ordering
+		while (sim.board.hasNext(sim.nextBlock)) {
+			sim.board.nextMove(newSim.board, sim.nextBlock);
+
+			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
+			best = (score > best ? score : best);
+			alpha = (alpha > best ? alpha : best);
+			if (alpha > beta)
+				break;
+		}
+	}
+}
+

@@ -32,7 +32,9 @@ typedef uint64_t u64;
 #define RD(x) ((x) << 13)
 #define R(x) ((x) << 12)
 #define RU(x) ((x) << 11)
+class Board;
 void print(u128 u);
+void printHist(Board);
 /*
 The bitboard representation of the tetris field
  */
@@ -95,6 +97,9 @@ public:
 
 	// tries to eliminate y'th row of board, returns the row mask if sccess, 0 if fail
 	static inline const void elim(u128& ori, u128& applied, u128& elim, int y, int& count);
+
+	// updates histogram
+	inline void updateHist(uint8_t* hist, u64 half);
 
 	// applies the type of tetrimino to the specified position
 	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);
@@ -330,11 +335,26 @@ inline const void Board::elim(u128& ori, u128& applied, u128& elim, int y, int& 
 	}
 }
 
+//const u64 colMask[5] = { 0x00000000000007feull, 0x000000000007fe000ull, 0x000000007fe000000ull, 0x000007fe000000000ull, 0x007fe0000000000ull };
+
+inline void Board::updateHist(uint8_t* hist, u64 half) {
+	// flip
+	half = ~half & 0x07fe7fe7fe7fe7feull;
+	half = ((half & 0x0554554554554554ull) >> 1) + (half & 0x02aa2aa2aa2aa2aaull);
+	half = ((half & 0x0198198198198198ull) >> 2) + (half & 0x0666666666666666ull);
+	half = ((half & 0x0600600600600600ull) >> 8) + ((half & 0x01e01e01e01e01e0ull) >> 4) + (half & 0x001e01e01e01e01eull);
+	half = (half & 0x00000000000007feull) >> 1 | (half & 0x00000000007fe000ull) >> 5 | (half & 0x00000007fe000000ull) >> 9 |
+		(half & 0x00007fe000000000ull) >> 13 | (half & 0x07fe000000000000ull) >> 17;
+	half += 0x0000010101010101;
+	*((u64*)(void*)hist) = (half & 0x000000ffffffffff) | (*((u64*)(void*)hist) & 0xffffff0000000000);
+}
+
 /* applies the type of tetrimino to the specified position, elm contains the eliminated rows, count is the
    number of rows eliminated*/
-void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) { // TODO load from field if depleted
+void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& elmCnt) { // TODO load from field if depleted
 	u128 tmp = board;
-	
+	int count = 0;
+
 	// update board
 	int index = PIECE[x][y];
 	if (index > 27)
@@ -437,10 +457,16 @@ void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& count) { 
 
 	// update hist after elimination
 	if (count) {
+		sanctify();
+		//print(swA);
+		updateHist(hist + 1, (u64)(swA & 0x0FFFFFFFFFFFFFFFF));
+		updateHist(hist + 6, (u64)((swA >> 60) & 0x0FFFFFFFFFFFFFFFF));
+		elmCnt += count;
+		/*return;
 		u64* h = (u64*)(void*)hist;
 		*h -= 0x0000010101010100 * count;
 		h = (u64*)(void*)&hist[6];
-		*h -= 0x0000000101010101 * count;
+		*h -= 0x0000000101010101 * count;*/
 	}
 }
 
@@ -618,7 +644,7 @@ void simplePlay() {
 
 			o -= 48;
 
-			if (o < 0 || o > 3 && (o + 48)) {
+			if ((o < 0 || o > 3) && (o + 48)) {
 				cout << "o out of range" << std::endl;
 				continue;
 			}
@@ -715,7 +741,7 @@ void Simulator::updateFeed(int type) {
 
 int Simulator::dropBlock(Board& board, Board::TMO type) {
 	while (moveCounter < 7) {
-		int ret = board.move(board, (Board::TMO)(type + moveCounter));
+		//int ret = board.move(board, (Board::TMO)(type + moveCounter));
 		//if (ret == 0)
 	}
 	

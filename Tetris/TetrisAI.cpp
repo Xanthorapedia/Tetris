@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <string>
 #include <cstring>
+#include <cfloat>
 #include <stdio.h>
 #endif // STDAFX
 
@@ -45,7 +46,7 @@ public:
 	u128 field[2];
 
 	// working area & sanctified working area
-	u128 wAr, swA;
+	u128 wAr, swA = 0;
 
 	// shifted working area
 	//u128 sfA[8] = { 0 };
@@ -82,6 +83,9 @@ public:
 	// lesbian - returns the least significant bit
 	static inline u128 LSB(register u128 num);
 
+	// count the number of 1's in board
+	static inline int get1Count(u64 board);
+
 	static void printBoard(const u128* board0, const u128* board1);
 
 	// sanctify the working area (fill holes) and put into swA
@@ -104,9 +108,9 @@ public:
 	// applies the type of tetrimino to the specified position
 	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);
 
-	int prevX;
+	int prevX = 0;
+	TMO lastType = static_cast<enum Board::TMO>(-1);
 	int inline hasNext(TMO type);
-
 	void inline nextMove(Board& newBoard, TMO type);
 
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
@@ -134,7 +138,9 @@ public:
 	Board::TMO feed();
 	void updateFeed(int type);
 
-	int dropBlock(Board&, Board::TMO type);
+	int hasNextDrop(Board & board, int type);
+
+	inline void dropBlock(Board&, int type);
 
 	// next tetrimino to place
 	Board::TMO nextBlock;
@@ -186,7 +192,7 @@ const uint8_t Board::XRANGE[19][2] = {
 // tetrimino patterns
 const u128 Board::TMNO[19] = {
 	0x0000008008018000ull, 0x000001001c000000ull, 0x000000c008008000ull, 0x000000001c004000ull, // 0L
-	0x0000018008008000ull, 0x000000401c000000ull, 0x000000800800c000ull, 0x000000001c010000ull, // 1J
+	0x0000018008008000ull, 0x000000401c000000ull, 0x000000800800c000ull, 0x0000000038020000ull, // 1J
 	0x0000008018010000ull, 0x000001800c000000ull, // 2S
 	0x0000010018008000ull, 0x000000c018000000ull, // 3Z
 	0x000000800c008000ull, 0x000000001c008000ull, 0x0000008018008000ull, 0x000000801c000000ull, // 4T
@@ -217,6 +223,20 @@ inline int Board::getIndex(int x, int y) {
 inline u128 Board::LSB(register u128 num) {
 	//return num & (num - (u128)1);
 	return num & -num;
+}
+
+/* gets the count of set bits */
+inline int Board::get1Count(u64 board) {
+#ifdef _MSC_VER
+	board -= (board >> 1) & 0x5555555555555555;
+	board = (board & 0x3333333333333333) + ((board >> 2) & 0x3333333333333333);
+	board = (board + (board >> 4)) & 0x0f0f0f0f0f0f0f0f;
+	board = (board * 0x0101010101010101) >> 56;
+	return (int)board;
+#endif
+#ifdef __GNUG__
+	return __builtin_popcountll(board);
+#endif
 }
 
 void Board::printBoard(const u128* board0, const u128* board1) {
@@ -472,13 +492,18 @@ void Board::apply(u128& board, int x, int y, TMO type, u128& elm, int& elmCnt) {
 
 /* determines if there is a next move for this type, returns y of next move */
 int inline Board::hasNext(TMO type) {
+	// a new iteration, update x to start searching
+	if (lastType != type) {
+		lastType = type;
+		prevX = XRANGE[type][0];
+	}
+
 	int y;
 	while (prevX <= XRANGE[type][1]) {
 		if ((y = cenY(prevX, type)) < 11)
 			return y;
 		prevX++;
 	}
-	prevX = XRANGE[type][0];
 	return 0;
 }
 
@@ -494,6 +519,7 @@ inline void Board::nextMove(Board & newBoard, TMO type) {
 	}
 }
 
+/* OBSOLETE */
 /* make a move of type and store to newBoard, returns the y of next move, 0 if no more */
 int inline Board::move(Board& newBoard, TMO type) {
 	static int prevX = 0;// TODO change to instance variable
@@ -521,7 +547,119 @@ int inline Board::move(Board& newBoard, TMO type) {
 }
 
 float Board::eval() {//TODO
-	return 0.0f;
+	////////////////////////tmp
+	// find max height
+	int maxHeight = 0;
+	for (int i = 1; i < 11; i++)
+		if (hist[i] > maxHeight)
+			maxHeight = hist[i];
+	if (maxHeight > 10)
+		return -FLT_MAX;
+	////////////////////////tmp
+
+	sanctify();
+	
+	// counting holes
+	u128 diff = (~wAr ^ swA) & HLF;
+	u64* p = (u64*)&diff;
+	int holeCount = get1Count(p[0]) + get1Count(p[1]);
+
+	print(wAr);
+	std::cout << "eval = " << -(holeCount + maxHeight) << std::endl;
+
+	return -(holeCount + maxHeight);
+}
+
+Board::TMO Simulator::feed() {
+	while (moveCounter < 7) {
+		if (tStat[moveCounter])
+			return types[moveCounter++];
+		moveCounter++;
+	}
+
+	return static_cast<enum Board::TMO>(-1);
+}
+
+void Simulator::updateFeed(int type) {
+	// all used up, fill up
+	u64 something = *((u64*)(void*)tStat) & 0x00ffffffffffffff;
+	if (something == 0 || something == 0x0001010101010101)
+		*((u64*)(void*)tStat) = 0x0002020202020202;
+	tStat[type]--;
+}
+
+inline int Simulator::hasNextDrop(Board& board, int type) {
+	while (moveCounter < typeCount[type]) {
+		int y = board.hasNext(static_cast<enum Board::TMO>(type + moveCounter));
+		if (y)
+			return y;
+		moveCounter++;
+	}
+
+	return 0;
+}
+
+inline void Simulator::dropBlock(Board& board, int type) {
+	if (hasNextDrop(this->board, type))
+		this->board.nextMove(board, static_cast<enum Board::TMO>(type + moveCounter));
+	else
+		moveCounter++;
+}
+
+float negaMax(Simulator& sim, int depth, float alpha, float beta, int player) {
+	if (depth == 0)
+		return sim.board.eval();
+
+	Simulator newSim;
+	float best = -FLT_MAX;
+
+	// feeder moves
+	if (player == 1) {
+		while ((newSim.nextBlock = sim.feed()) != -1) {
+			newSim = sim;
+			newSim.moveCounter = 0;
+			newSim.updateFeed(sim.moveCounter - 1);
+
+			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
+			best = (score > best ? score : best);
+			alpha = (alpha > best ? alpha : best);
+			if (alpha > beta)
+				break;
+		}
+	}
+	// droper moves
+	else {
+		// move ordering by center height
+		int y = -1;
+		// at most 10 moves have the same height
+		Board results[10][40];
+		// 10 different height
+		uint8_t stat[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		// for each possible drop
+		while (y = sim.hasNextDrop(sim.board, sim.nextBlock)) {// BUG: block feeding does not update
+			// go to the row corresponding to that height
+			sim.dropBlock(results[y][stat[y]++], sim.nextBlock);
+		}
+
+		// if no next move, die
+		if (y == -1)
+			return -FLT_MAX;
+
+		// get each move
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < stat[i]; j++) {
+				newSim = sim;
+				newSim.moveCounter = 0;
+				newSim.board = results[i][j];
+				float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
+				best = (score > best ? score : best);
+				alpha = (alpha > best ? alpha : best);
+				if (alpha > beta)
+					break;
+			}
+		}
+	}
+	return best;
 }
 
 ///* gets the histogram of columns */
@@ -547,6 +685,7 @@ void printHist(Board b) {
 	std::cout << std::endl;
 }
 
+/* OBSOLETE */
 void printMove(Board b, Board::TMO type) {
 	Board m;
 	m.wAr = 0;
@@ -554,6 +693,16 @@ void printMove(Board b, Board::TMO type) {
 		print(m.wAr);
 	}
 	print(m.wAr);
+}
+
+void printMoveN(Board b, Board::TMO type) {
+	Board m;
+	m.wAr = 0;
+	while (b.hasNext(type)) {
+		b.nextMove(m, type);
+		print(m.wAr);
+		std::cout << "eval = " << m.eval() << std::endl;
+	}
 }
 
 int table[4][7] = {
@@ -601,12 +750,14 @@ void simplePlay() {
 	cout << "size" << sizeof(nb) << std::endl;
 
 	brd.wAr = 0;
+	brd.swA = 0;
 	memset(brd.hist, 1, 11);
 	elim = 0;
 	count = 0;
 
 	while (true) {
 		print(brd.wAr);
+		cout << "eval = " << brd.eval() << std::endl;
 		int x, y;
 		char o, b;
 		cin >> x >> y >> o >> b;
@@ -661,7 +812,7 @@ void simplePlay() {
 			Board::TMO type = static_cast<enum Board::TMO>(t);
 
 			if (x == y && y == -1) {
-				printMove(brd, type);
+				printMoveN(brd, type);
 				continue;
 			}
 
@@ -691,29 +842,47 @@ void simplePlay() {
 
 int main() {
 	using std::cout;
+	using std::endl;
+	Board brd;
+	Simulator sml;
+	sml.nextBlock = Board::J0;
+	negaMax(sml, 3, -FLT_MAX, FLT_MAX, -1);
+	//sml.updateFeed(0);
+	//sml.updateFeed(1);
+	//sml.updateFeed(2);
+	//sml.updateFeed(3);
+	//sml.updateFeed(4);
+	//sml.updateFeed(5);
+	//sml.updateFeed(6);
+	//sml.updateFeed(0);
+	//cout << "feed = " << sml.feed() << endl;
+	//cout << "feed = " << sml.feed() << endl;
+	/*for (int i = 0; i < 7; i++) {
+	cout << (int)sml.tStat[i];
+	}*/
 	/*for (int i = 0; i < 11; i++) {
 	for (int j = 0; j < 11; j++) {
 	cout << (i - 1) * CH + 11 - j << ", ";
 	}
 	cout << std::endl;
 	}*/
-	simplePlay();
+	//simplePlay();
 
-	Board brd;
-	u128 k;
-	int l;
+	////Board brd;
+	//u128 k;
+	//int l;
 
-	brd.wAr = (Board::TMNO[1] >> 12 | Board::TMNO[10] | Board::TMNO[8] << 41);
-	brd.sanctify();
-	brd.getHist();
-	print(brd.wAr);
+	//brd.wAr = (Board::TMNO[1] >> 12 | Board::TMNO[10] | Board::TMNO[8] << 41);
+	//brd.sanctify();
+	//brd.getHist();
+	//print(brd.wAr);
 	time_t time = clock();
-	for (int j = 0; j < 2E6; j++)
-		for (int i = 1; i < 10; i++) {
-			brd.cenY(i, Board::J1);
-			brd.apply(brd.wAr, 5, 5, Board::J1, k, l);
-			//std::cout << brd.cenY(i, Board::J1) << "  ";
-		}
+
+	//for (int i = 1; i < 10; i++) {
+	//	brd.cenY(i, Board::J1);
+	//	brd.apply(brd.wAr, 5, 5, Board::J1, k, l);
+	//	//std::cout << brd.cenY(i, Board::J1) << "  ";
+	//}
 	cout << (float)(clock() - time) / CLOCKS_PER_SEC << std::endl;
 
 
@@ -722,68 +891,3 @@ int main() {
 	std::cin.get();
 	return 0;
 }
-
-Board::TMO Simulator::feed() {
-	while (moveCounter < 7) {
-		if (tStat[moveCounter])
-			return types[moveCounter++];
-	}
-
-	return Board::L3;
-}
-
-void Simulator::updateFeed(int type) {
-	// all used up, fill up
-	if (*((u64*)(void*)tStat) == 0 || *((u64*)(void*)tStat) == 0x0001010101010101)
-		*((u64*)(void*)tStat) = 0x0002020202020202;
-	tStat[type]--;
-}
-
-int Simulator::dropBlock(Board& board, Board::TMO type) {
-	while (moveCounter < 7) {
-		//int ret = board.move(board, (Board::TMO)(type + moveCounter));
-		//if (ret == 0)
-	}
-
-	return 0;
-}
-
-float negaMax(Simulator& sim, int depth, float alpha, float beta, int player) {
-	if (depth == 0)
-		return sim.board.eval();
-
-	Simulator newSim = sim;
-	float best = -1;// TODO negative inf
-
-					// feeder moves
-	if (player == 1) {
-		while (sim.feed() != Board::L3) {
-			newSim = sim;
-			newSim.updateFeed(sim.moveCounter - 1);
-
-			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
-			best = (score > best ? score : best);
-			alpha = (alpha > best ? alpha : best);
-			if (alpha > beta)
-				break;
-		}
-	}
-	// droper moves
-	else {//TODO orientation
-		int nextY = sim.board.hasNext(sim.nextBlock);
-		// die
-		if (nextY == 0)
-			return -1;// TODO negative inf
-					  //TODO move ordering
-		while (sim.board.hasNext(sim.nextBlock)) {
-			sim.board.nextMove(newSim.board, sim.nextBlock);
-
-			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player);
-			best = (score > best ? score : best);
-			alpha = (alpha > best ? alpha : best);
-			if (alpha > beta)
-				break;
-		}
-	}
-}
-

@@ -45,13 +45,13 @@ public:
 	u128 field[2];
 
 	// working area & sanctified working area
-	u128 wAr, swA;
+	u128 wAr, swA;  //wAr 10列10行 一头一尾
 
 	// shifted working area
 	//u128 sfA[8] = { 0 };
 
 	// the height of ten columns
-	uint8_t hist[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	uint8_t hist[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };//储存的是每一列最高高度y+1即最低空方格位置hist  注意 这是没有把洞洞当成一格自动下拉填满
 
 	/*
 	lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11
@@ -73,19 +73,19 @@ public:
 	// tetrimino types
 	enum TMO { L0, L1, L2, L3, J0, J1, J2, J3, S0, S1, Z0, Z1, T0, T1, T2, T3, I3, I4, O0 };
 
-	static inline int getPiece(const u128* board, int x, int y);
+	static inline int getPiece(const u128* board, int x, int y);//能够get到一个board上x，y这个位置有没有填满
 	static inline int getPiece(const u128 board, int x, int y);
 
 	// gets the index of the point
-	static inline int getIndex(int x, int y);
+	static inline int getIndex(int x, int y);//getIndex得到的是x，y这个块的bit index
 
 	// lesbian - returns the least significant bit
-	static inline u128 LSB(register u128 num);
+	static inline u128 LSB(register u128 num);//get的是最低的1bit
 
 	static void printBoard(const u128* board0, const u128* board1);
 
 	// sanctify the working area (fill holes) and put into swA
-	inline void sanctify();
+	inline void sanctify();//得到一个把洞洞填满的board 相当于每列填满的方块数量是对应列hist的值 sanctify以后的结果会存在swA里面
 
 	// gets the greater number
 	inline uint8_t max(int8_t a, int8_t b);
@@ -93,21 +93,21 @@ public:
 	inline uint8_t max(int8_t a, int8_t b, int8_t c, int8_t d);
 
 	// finds the possible y of a tetrimino when cetered at (x, )
-	int cenY(int x, TMO type);
+	int cenY(int x, TMO type);//cenY得到的是这一种tetrimino在x上中心的最低位置 判断能不能把方块放下去
 
 	// tries to eliminate y'th row of board, returns the row mask if sccess, 0 if fail
-	static inline const void elim(u128& ori, u128& applied, u128& elim, int y, int& count);
-
+	static inline const void elim(u128& ori, u128& applied, u128& elim, int y, int& count);//applied是一个（可能）填满了一行的board  ori是在填入最后一个方块之前的board  elim会在applied搜索y这一行，看能不能消去，如果能，会从ori里面提取这一行，放到elim里面 然后把count+1 这样就能得到去除被消去方块的消去行
+	
 	// updates histogram
-	inline void updateHist(uint8_t* hist, u64 half);
+	inline void updateHist(uint8_t* hist, u64 half);//udpateHist会用四分之一个board（half）更新hist 
 
 	// applies the type of tetrimino to the specified position
-	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);
+	void apply(u128& board, int x, int y, TMO type, u128& elim, int& count);//在board上的x，y（方块中心）这个位置上放置type这种tetrimino 并把消去的结果存到elim里面，count+=消去行数 
 
-	int prevX;
-	int inline hasNext(TMO type);
+	int prevX;//
+	int inline hasNext(TMO type);//hasNext会检查type能不能放下  具体的x位置是prevX的值 
 
-	void inline nextMove(Board& newBoard, TMO type);
+	void inline nextMove(Board& newBoard, TMO type);//nextMove会以当前的wAr为基础在newBoard上放置type（不更改wAr） 然后prevX++就相当于循环枚举当前wAr上type可以放的位置，直到nextMove里面call到hasNext发现没有next为止
 
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
 	int inline move(Board& newBoard, TMO type);
@@ -203,7 +203,7 @@ inline int Board::getPiece(const u128* board, int x, int y) {
 		return (u64)((board[1] >> ((--x) * CH + (21 - y))) & 1);
 	else
 		return (u64)((board[0] >> ((--x) * CH + 11 - y)) & 1);
-}
+}//首先计算bit的index（(--x) * CH + (21 - y)）然后把整个board移动这么多格（相当于这个bit被移动到0的位置了）
 
 inline int Board::getPiece(const u128 board, int x, int y) {
 	return (u64)((board >> ((--x) * CH + 11 - y)) & 1);

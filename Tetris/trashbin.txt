@@ -81,3 +81,77 @@ u128 Board::cenPos(TMO type) {
 	// moves raw upward and & with ~itself to get the lower edges of the possible position area
 	return raw & ~U(raw);
 }
+
+Board brd;
+	brd.wAr = 0;
+
+	u128 elim = 0;
+	int count = 0;
+
+	brd.apply(brd.wAr, 2, 1, static_cast<enum Board::TMO>(6), elim);
+	brd.apply(brd.wAr, 6, 1, static_cast<enum Board::TMO>(18), elim);
+	brd.apply(brd.wAr, 8, 1, static_cast<enum Board::TMO>(12), elim);
+	brd.apply(brd.wAr, 2, 3, static_cast<enum Board::TMO>(3), elim);
+	brd.apply(brd.wAr, 7, 4, static_cast<enum Board::TMO>(16), elim);
+	brd.apply(brd.wAr, 10, 2, static_cast<enum Board::TMO>(13), elim);
+	print(brd.wAr);
+	//count = brd.apply(brd.wAr, 4, 2, static_cast<enum Board::TMO>(13), elim);
+
+	if (count) {
+		print(brd.wAr);
+		printHist(brd);
+		print(elim);
+		cout << "eliminated: " << count << std::endl;
+	}
+
+	//simplePlay();
+
+	Simulator sml;
+	sml.board = brd;
+	sml.nextBlock = Board::I2;
+	sml.tStat[0] = 0;
+	sml.eval();
+	negaMax(sml, 3, -FLT_MAX, FLT_MAX, -1, true);
+	cout << "x: " << sml.bestX << ", y: " << sml.bestY << ", b: " << sml.bestB << endl;
+	//sml.updateFeed(0);
+	//sml.updateFeed(1);
+	//sml.updateFeed(2);
+	//sml.updateFeed(3);
+	//sml.updateFeed(4);
+	//sml.updateFeed(5);
+	//sml.updateFeed(6);
+	//sml.updateFeed(0);
+	//cout << "feed = " << sml.feed() << endl;
+	//cout << "feed = " << sml.feed() << endl;
+	/*for (int i = 0; i < 7; i++) {
+	cout << (int)sml.tStat[i];
+	}*/
+	/*for (int i = 0; i < 11; i++) {
+	for (int j = 0; j < 11; j++) {
+	cout << (i - 1) * CH + 11 - j << ", ";
+	}
+	cout << std::endl;
+	}*/
+	//simplePlay();
+
+	////Board brd;
+	//u128 k;
+	//int l;
+
+	//brd.wAr = (Board::TMNO[1] >> 12 | Board::TMNO[10] | Board::TMNO[8] << 41);
+	//brd.sanctify();
+	//brd.getHist();
+	//print(brd.wAr);
+	time_t time = clock();
+
+	//for (int i = 1; i < 10; i++) {
+	//	brd.cenY(i, Board::J1);
+	//	brd.apply(brd.wAr, 5, 5, Board::J1, k, l);
+	//	//std::cout << brd.cenY(i, Board::J1) << "  ";
+	//}
+	cout << (float)(clock() - time) / CLOCKS_PER_SEC << std::endl;
+
+
+	//cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << full.hi << "ull" << std::endl;
+	//cout << "0x" << std::setfill('0') << std::setw(16) << std::hex << full.lo << "ull" << std::endl;
+	std::cin.get();

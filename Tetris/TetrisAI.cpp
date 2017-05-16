@@ -1101,7 +1101,8 @@ class BotzoneGame {
 	Simulator me;
 	Simulator you;
 };
-
+//遗传算法的main
+/*
 int main() {
 	srand(time(NULL));
 	using std::cout;
@@ -1140,4 +1141,52 @@ int main() {
 	you.board.wAOfs += elimCount;
 	you.updateFeed(block);
 }
+*/  //
 
+int currBotColor;
+int enemyColor;
+int turn;
+int ft;//first type
+//request and response
+class rar{
+public:
+	int type, position, xx, yy;//position  在里面代指方向，T_T词汇萌新，找不到什么就乱写了
+	
+}req,res;
+//req里面t是自己拿到的，其他都是别人处理情况
+//res t是别人拿到的 其他都是自己处理情况
+int main() {
+	using std::cin;
+	using std::cout;
+	using std::endl;
+	
+	//定义board 并初始化
+	Board brd[2];
+	brd[enemyColor].wAr = brd[currBotColor].wAr = 0;
+	brd[enemyColor].swA = brd[currBotColor].swA = 0;
+	memset(brd[enemyColor].hist, 1, 11);
+	memset(brd[currBotColor].hist, 1, 11);
+
+	//简单交互
+	//先输入回合
+	cin >> turn;
+	//输入第一次type 和颜色
+	cin >> ft; cin >> currBotColor; enemyColor = !currBotColor;
+	//输入前面所有别人的处理和您的处理
+	for (int i = 0; i < turn - 1; i++) {
+		//放置之前敌人状态
+		cin >> req.type >> req.xx >> req.yy >> req.position;
+		req.type--;
+		int t = table[req.position][req.type];
+		Board::TMO type = static_cast<enum Board::TMO>(t);// 这个不会写 ，就是把对方状态放到board【enemy】里面
+		
+		//放置之前自己状态
+		t = table[res.position][res.type];
+		cin >> res.type >> res.xx >> res.yy >> res.position;
+		Board::TMO type = static_cast<enum Board::TMO>(t);//这个也不会 同上，只不过改为放置自己状态
+	}
+	//需要算出给什么 然后放到res里面
+	//type 是丢给别人的  其他都是自己怎样放置 别人给的type在req里面
+	cout << res.type << " " << res.xx << " " << res.yy << " " << res.position;
+	return 0;
+}

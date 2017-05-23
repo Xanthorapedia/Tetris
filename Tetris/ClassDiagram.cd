@@ -1,0 +1,193 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="Json::FastWriter" Collapsed="true">
+    <Position X="0.5" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AIAACAIAAgAFAAAAAAAAAAAAAAIAAAAAAQAAEAAAAAE=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::StyledWriter" Collapsed="true">
+    <Position X="2.75" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BAIBAAEIAQICAAAABAAAAAAAAAIBAAAAQQAQBAAIgBE=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::Reader" Collapsed="true">
+    <Position X="10.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AkAEIAAIAABADBEBAIAAAAASAgIBzUCCADEE4GAgIIo=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::Features" Collapsed="true">
+    <Position X="5.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAEAAAAAAAARAAAAAAAAAAABAAAAMACAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::StaticString" Collapsed="true">
+    <Position X="5.25" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAACAAAAAAAAEAAAAAAAAAAAAAAAABAAAAAQAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::Path" Collapsed="true">
+    <Position X="7" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AgAAAAAAAAACAAIAgAAAAAAAABEgAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::PathArgument" Collapsed="true">
+    <Position X="8.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAIAAAAAAgAAACAAAAAAAAAABAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::Value" Collapsed="true">
+    <Position X="8.75" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>IEAoGAgSgSBEiCgqAIQoTYlSAQeBE3BAAQWhSAAqQhA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueIteratorBase" Collapsed="true">
+    <Position X="1.75" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAACAAAAAhAAAAAAAkASAgQAAAAQIAAEAgAAABAEA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueIterator" Collapsed="true">
+    <Position X="0.5" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAQAEAAgCAAAAAAAAAAAAgAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueConstIterator" Collapsed="true">
+    <Position X="2.75" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAQCEAAgAAAAAAAAAAAAAgAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueMapAllocator" Collapsed="true">
+    <Position X="10.5" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAwAAQAAAgAAAAAAAAAAAAEACABAAAAAAAAAAQAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueInternalLink" Collapsed="true">
+    <Position X="7" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAAAAAAAAAAAoAAAAAAAAAAAABEAgAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueInternalArray" Collapsed="true">
+    <Position X="5.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAEAACACCAIAAAgJAAACBgIEBAAAAAiwAgAABAQAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueInternalMap" Collapsed="true">
+    <Position X="8.75" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAEAAAAACAQBAHBICEACAgAGBAADIAD4AgAAAAQAg=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::ValueArrayAllocator" Collapsed="true">
+    <Position X="10.5" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BAAAAAIAAQAAAABAAAgAAAAAAQAAgAAAAAAAAAAAAAg=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::Writer" Collapsed="true">
+    <Position X="1.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAQAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Json::StyledStreamWriter" Collapsed="true">
+    <Position X="7" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAIBAAEIAQIOAAAABAAAAAAACAIBAAAAAQAQBAAIgBE=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Typedef Name="Json::Int" Collapsed="true">
+    <Position X="7" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::UInt" Collapsed="true">
+    <Position X="7" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::LargestInt" Collapsed="true">
+    <Position X="10.5" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::LargestUInt" Collapsed="true">
+    <Position X="5.25" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::Int64" Collapsed="true">
+    <Position X="8.75" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::UInt64" Collapsed="true">
+    <Position X="8.75" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Typedef Name="Json::ArrayIndex" Collapsed="true">
+    <Position X="5.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Typedef>
+  <Enum Name="Json::ValueType" Collapsed="true">
+    <Position X="7" Y="3.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAgAAgADAAAUAAAAAAAAAAIBAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Enum Name="Json::CommentPlacement" Collapsed="true">
+    <Position X="5.25" Y="3.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAQAAAAAAAAAAAAAAABACAAAAAAAAAACAAAAAAAAA=</HashCode>
+      <FileName>jsoncpp\json.h</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

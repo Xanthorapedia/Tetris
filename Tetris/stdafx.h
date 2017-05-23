@@ -5,6 +5,7 @@
 
 #pragma once
 #define STDAFX
+//#include "jsoncpp\json.h"
 #ifdef _MSC_VER
 #include "targetver.h"
 #include "int128.hpp"
@@ -21,5 +22,6 @@
 #include <cstring>
 #include <cfloat>
 #include <time.h>
+#include <cstdlib>
 
 // TODO: reference additional headers your program requires here

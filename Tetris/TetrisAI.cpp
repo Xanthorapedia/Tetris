@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
-
+//#define DEBUG
+#define TRAIN
 #ifndef STDAFX
 #include <inttypes.h>
 #include <iostream>
@@ -8,6 +9,8 @@
 #include <cstring>
 #include <cfloat>
 #include <stdio.h>
+#include <cstdlib>
+//#include "jsoncpp/json.h"
 #endif // STDAFX
 
 #ifdef _MSC_VER
@@ -41,19 +44,6 @@ The bitboard representation of the tetris field
 */
 class Board {
 public:
-
-	// each represents half of the field i.e. [0] = lower 10 rows + 1 bottom, [1] = upper 10 rows + 1 top
-	u128 field;
-
-	// working area & sanctified working area
-	u128 wAr = 0, swA = 0;  //wAr 10列10行 一头一尾
-
-	// working area height offset, initially aligned to bottom
-	uint8_t wAOfs = 0;
-
-	// the height of ten columns
-	uint8_t hist[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };//储存的是每一列最高高度y+1即最低空方格位置hist  注意 这是没有把洞洞当成一格自动下拉填满
-
 	/*
 	lower/upper bound of a half field (0th/11th row), the inverse of row 1 & 11
 	half of the field without boundaries, masks for selecting rows for elimination check
@@ -105,17 +95,14 @@ public:
 	// loads rows from field to wAr
 	inline void load();
 
+	// unloads rows from field to wAr
+	inline void unload();
+
 	// updates histogram
 	inline void updateHist(uint8_t* hist, u64 half);//udpateHist会用四分之一个board（half）更新hist 
 
 	// applies the type of tetrimino to the specified position
 	int apply(u128& board, int x, int y, TMO type, u128& elim);//在board上的x，y（方块中心）这个位置上放置type这种tetrimino 并把消去的结果存到elim里面，count+=消去行数 
-
-	int prevX = 0;
-	TMO lastType = static_cast<enum Board::TMO>(-1);
-
-	// elimination count
-	int elimCntr = 0;
 
 	int inline hasNext(TMO type);//hasNext会检查type能不能放下  具体的x位置是prevX的值 
 	int inline nextMove(Board& newBoard, TMO type);//nextMove会以当前的wAr为基础在newBoard上放置type（不更改wAr） 然后prevX++就相当于循环枚举当前wAr上type可以放的位置，直到nextMove里面call到hasNext发现没有next为止
@@ -123,7 +110,27 @@ public:
 	// make a move of type and store to newBoard, returns the y of next move, 0 if no more
 	int inline move(Board& newBoard, TMO type);
 
-	float c[4];
+
+	// each represents half of the field i.e. [0] = lower 10 rows + 1 bottom, [1] = upper 10 rows + 1 top
+	u128 field = 0;
+
+	// working area & sanctified working area
+	u128 wAr = 0, swA = 0;  //wAr 10列10行 一头一尾
+
+							// working area height offset, initially aligned to bottom
+	uint8_t wAOfs = 0;
+
+	int prevX = 0;
+	TMO lastType = static_cast<enum Board::TMO>(-1);
+
+	// elimination count
+	int elimCntr = 0;
+
+	// the height of ten columns
+	uint8_t hist[11] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };//储存的是每一列最高高度y+1即最低空方格位置hist  注意 这是没有把洞洞当成一格自动下拉填满
+
+	// hol, hei, rou, elim
+	float c[4] = { 0.35663f, 0.510066f, 0.184483f, 0.760666f, };
 	float eval();
 
 	////// gets the histogram of columns
@@ -363,6 +370,9 @@ int Board::cenY(int x, TMO type) {
 
 /* tries to eliminate y'th row of board, returns the row mask if sccess, 0 if fail */
 inline const void Board::elim(u128& ori, u128& applied, u128& elim, int y, int& count) {
+	if (y > 10)
+		return;
+
 	const u128* mask = ROW + y;
 
 	// if row full
@@ -373,16 +383,40 @@ inline const void Board::elim(u128& ori, u128& applied, u128& elim, int y, int& 
 	}
 }
 
-/* load rows from field to wAr after elimination*/
+/* load rows from field to wAr after elimination */
 inline void Board::load() {
-	// already sanctified
-	// if the bottom of wAr has a hole and has rows in field
-	while (wAr & ROW[1] && wAOfs) {
+	sanctify();
+	// if the bottom of wAr has a hole and has stored rows
+	while ((swA & ROW[1]) && wAOfs) {
 		// wAr moves up, transfer the top row from field to the bottom of wAr, update offset
 		wAr = U(wAr);
-		wAr |= (field & ROW[wAOfs]) >> (wAOfs - 1);
+		wAr |= (field & ROW[wAOfs]) << (wAOfs - 1);
+		field &= ~ROW[wAOfs];
 		wAOfs--;
+		sanctify();
 	}
+
+	// update hist
+	updateHist(hist + 1, *(u64*)&swA);
+	updateHist(hist + 6, (u64)(swA >> 60));
+}
+
+/* unload rows from wAr to field after elimination */
+inline void Board::unload() {
+	sanctify();
+	// if the second row from bottom of wAr is full and # of stored rows < 10
+	while ((swA & ROW[2]) == (u128)0 && wAOfs < 10) {
+		// transfer the bottom row from wAr to the top of field, update offset, wAr moves down
+		field |= (wAr & ROW[1]) >> wAOfs;
+		wAr &= ~ROW[1];
+		wAr = D(wAr);
+		wAOfs++;
+		sanctify();
+	}
+
+	// update hist
+	updateHist(hist + 1, *(u64*)&swA);
+	updateHist(hist + 6, (u64)(swA >> 60));
 }
 
 //const u64 colMask[5] = { 0x00000000000007feull, 0x000000000007fe000ull, 0x000000007fe000000ull, 0x000007fe000000000ull, 0x007fe0000000000ull };
@@ -395,13 +429,17 @@ inline void Board::updateHist(uint8_t* hist, u64 half) {
 	half = ((half & 0x0600600600600600ull) >> 8) + ((half & 0x01e01e01e01e01e0ull) >> 4) + (half & 0x001e01e01e01e01eull);
 	half = (half & 0x00000000000007feull) >> 1 | (half & 0x00000000007fe000ull) >> 5 | (half & 0x00000007fe000000ull) >> 9 |
 		(half & 0x00007fe000000000ull) >> 13 | (half & 0x07fe000000000000ull) >> 17;
-	half += 0x0000000101010101 * (wAOfs + 1);
+	half += 0x0000000101010101;// * (wAOfs + 1);
 	*((u64*)(void*)hist) = (half & 0x000000ffffffffff) | (*((u64*)(void*)hist) & 0xffffff0000000000);
 }
 
 /* applies the type of tetrimino to the specified position, elm contains the eliminated rows, count is the
 number of rows eliminated*/
-int Board::apply(u128& board, int x, int y, TMO type, u128& elm) { // TODO load from field if depleted
+int Board::apply(u128& board, int x, int y, TMO type, u128& elm) {
+#ifndef TRAIN
+	load();
+#endif // !TRAIN
+
 	u128 tmp = board;
 	int count = 0;
 
@@ -504,24 +542,27 @@ int Board::apply(u128& board, int x, int y, TMO type, u128& elm) { // TODO load 
 	default:
 		break;
 	}
-
+	
+#ifdef TRAIN
 	// update hist after elimination
 	if (count) {
-		sanctify();
-		load();
 		//print(swA);
 		//updateHist(hist + 1, (u64)(swA & 0x0FFFFFFFFFFFFFFFF));
 		//updateHist(hist + 6, (u64)((swA >> 60) & 0x0FFFFFFFFFFFFFFFF));
 
+		sanctify();
+
 		updateHist(hist + 1, *(u64*)&swA);
 		updateHist(hist + 6, (u64)(swA >> 60));
-		/*return;
-		u64* h = (u64*)(void*)hist;
-		*h -= 0x0000010101010100 * count;
-		h = (u64*)(void*)&hist[6];
-		*h -= 0x0000000101010101 * count;*/
+	//	/*return;
+	//	u64* h = (u64*)(void*)hist;
+	//	*h -= 0x0000010101010100 * count;
+	//	h = (u64*)(void*)&hist[6];
+	//	*h -= 0x0000000101010101 * count;*/
 	}
-
+#else
+	unload();
+#endif // !TRAIN
 	return count;
 }
 
@@ -536,7 +577,8 @@ int inline Board::hasNext(TMO type) {
 	int y;
 	while (prevX <= XRANGE[type][1]) {
 		if ((y = cenY(prevX, type)) < 10)
-			return y;
+			if(y + wAOfs < 20)
+				return y;
 		prevX++;
 	}
 	return 0;
@@ -548,7 +590,7 @@ inline int Board::nextMove(Board & newBoard, TMO type) {
 	int y = hasNext(type);
 	if (y) {
 		newBoard = *this;
-		u128 elim;
+		u128 elim = 0;
 		count = newBoard.apply(newBoard.wAr, prevX++, y, type, elim);//TODO null, count
 	}
 	return count;
@@ -585,10 +627,13 @@ float Board::eval() {//TODO
 	////////////////////////tmp
 	// find max height
 	int maxHeight = 0;
-	for (int i = 1; i < 11; i++)
+	int totalHeight = 0;
+	for (int i = 1; i < 11; i++) {
 		if (hist[i] > maxHeight)
-			maxHeight = hist[i];
-	if (maxHeight > 10)
+			maxHeight = hist[i] - 1;
+		totalHeight += hist[i] + wAOfs - 1;
+	}
+	if (maxHeight + wAOfs > 20)
 		return -FLT_MAX;
 	////////////////////////tmp
 
@@ -598,22 +643,38 @@ float Board::eval() {//TODO
 	u128 diff = (~wAr ^ swA) & HLF;
 	u64* p = (u64*)&diff;
 	int holeCount = get1Count(p[0]) + get1Count(p[1]);
+	// holes in field
+	u128 mask = 0;
+	for (int i = 1; i < wAOfs + 1; i++)
+		mask |= ROW[i];
+	diff = (field ^ mask) & HLF;
+	p = (u64*)&diff;
+	holeCount += get1Count(p[0]) + get1Count(p[1]);
 
 	// roughness
 	diff = L(swA) ^ swA;
 	p = (u64*)&diff;
 	// shift to mask out the last col
 	p[1] &= 0x000007fe7fe7fe7f;
-	int diffCount = get1Count(p[0]) + get1Count(p[1]);
+	int roughness = get1Count(p[0]) + get1Count(p[1]);
+	//roughness = 0;
+	/*float roughness = 0;
+	float ave = totalHeight / 10;
+	for (int i = 1; i < 11; i++) {
+		register float dif = hist[i] - ave;
+		roughness += dif * dif / 10;
+	}*/
 
-	/*print(wAr);
-	std::cout << "hei = " << maxHeight << std::endl;
+#ifdef DEBUG
+	print(wAr);
+	std::cout << "hei = " << totalHeight << std::endl;
 	std::cout << "hol = " << holeCount << std::endl;
-	std::cout << "rou = " << diffCount << std::endl;
+	std::cout << "rou = " << roughness << std::endl;
 	std::cout << "elm = " << elimCntr << std::endl;
-	std::cout << "eval = " << -(holeCount * c[0] + (maxHeight - 1) * c[1] + diffCount * c[2] - elimCntr * c[3]) << std::endl;*/
+	std::cout << "eval = " << -(holeCount * c[0] + totalHeight * c[1] + roughness * c[2] - elimCntr * c[3]) << std::endl;
+#endif
 
-	return -(holeCount * c[0] + (maxHeight - 1) * c[1] + diffCount * c[2] - elimCntr * c[3]);
+	return -(holeCount * c[0] + totalHeight * c[1] + roughness * c[2] - elimCntr * c[3]);
 }
 
 inline Board::TMO Simulator::feed() {
@@ -627,11 +688,11 @@ inline Board::TMO Simulator::feed() {
 }
 
 inline void Simulator::updateFeed(int type) {
+	tStat[type]--;
 	// all used up, fill up
 	u64 something = *((u64*)(void*)tStat) & 0x00ffffffffffffff;
 	if (something == 0 || something == 0x0001010101010101)
 		*((u64*)(void*)tStat) = 0x0002020202020202;
-	tStat[type]--;
 }
 
 inline int Simulator::hasNextDrop(Board& board, Board::TMO type) {
@@ -647,7 +708,7 @@ inline int Simulator::hasNextDrop(Board& board, Board::TMO type) {
 
 inline void Simulator::dropBlock(Board& board, Board::TMO type) {
 	if (hasNextDrop(this->board, type))
-		board.elimCntr += this->board.nextMove(board, static_cast<enum Board::TMO>(type + moveCounter));
+		board.elimCntr = this->board.nextMove(board, static_cast<enum Board::TMO>(type + moveCounter));
 	else
 		moveCounter++;
 }
@@ -665,17 +726,38 @@ float negaMax(Simulator& sim, int depth, float alpha, float beta, int player, bo
 
 	// feeder moves
 	if (player == 1) {
-		while (newSim = sim, (newSim.nextBlock = sim.feed()) != -1) {
+		while (true) {
+			newSim = sim;
 			newSim.moveCounter = 0;
+			if ((newSim.nextBlock = sim.feed()) == -1)
+				break;
 			newSim.updateFeed(sim.moveCounter - 1);
+
+#ifdef DEBUGS
+			std::cout << "depth: " << depth << std::endl;
+			std::cout << "used: " << newSim.nextBlock << std::endl;
+			std::cout << "rem: ";
+			for (int i = 0; i < 7; i++) {
+				std::cout << (int)newSim.tStat[i] << " ";
+			}
+			std::cout << std::endl;
+#endif // DEBUG
 
 			float score = -negaMax(newSim, depth - 1, -beta, -alpha, -player, false);
 			if (score > best) {
 				best = score;
 				if (firstTime) {
+#ifdef DEBUGS
+					std::cout << "best: " << newSim.nextBlock << std::endl;
+#endif // DEBUG
 					sim.bestB = newSim.nextBlock;
 				}
 			}
+#ifdef DEBUGS
+			std::cout << "used: " << newSim.nextBlock << std::endl;
+			std::cout << "score: " << score << std::endl;
+#endif // DEBUG
+
 			alpha = (alpha > best ? alpha : best);
 			if (alpha > beta)
 				return best;
@@ -696,6 +778,16 @@ float negaMax(Simulator& sim, int depth, float alpha, float beta, int player, bo
 			// go to the row corresponding to that height
 			sim.dropBlock(results[y][stat[y]], sim.nextBlock);
 			dropedB[y][stat[y]] = sim.nextBlock + sim.moveCounter;
+#ifdef DEBUG
+			std::cout << "MOVEMOVEMOVEMOVEMOVEMOVEMOVEMOVEMOVEMOVE" << std::endl;
+			print(results[y][stat[y]].wAr);
+			std::cout << (int)results[y][stat[y]].wAOfs << "+";
+			for (int i = 1; i < 11; i++)
+				std::cout << "  " << (int)results[y][stat[y]].hist[i];
+			std::cout << std::endl;
+			std::cout << "x: " << results[y][stat[y]].prevX << ", y: " << y + results[y][stat[y]].wAOfs 
+				<< ", b: " << (int)dropedB[y][stat[y]] << std::endl;
+#endif // DEBUG
 			stat[y]++;
 		}
 
@@ -713,12 +805,16 @@ float negaMax(Simulator& sim, int depth, float alpha, float beta, int player, bo
 				if (score > best) {
 					best = score;
 					if (firstTime) {
-						/*std::cout << "BESTBESTBESTBESTBESTBESTBESTBESTBESTBEST";
-						print(results[i][j].wAr);
-						std::cout << results[i][j].eval();*/
 						sim.bestX = results[i][j].prevX;
 						sim.bestY = i;
 						sim.bestB = dropedB[i][j];
+
+#ifdef DEBUG
+						std::cout << "BESTBESTBESTBESTBESTBESTBESTBESTBESTBEST" << std::endl;
+						print(results[i][j].wAr);
+						std::cout << "x: " << sim.bestX << ", y: " << sim.bestY << ", b: " << sim.bestB 
+							<< ", eval: " << results[i][j].eval() << std::endl;
+#endif // DEBUG
 					}
 				}
 				alpha = (alpha > best ? alpha : best);
@@ -730,6 +826,7 @@ float negaMax(Simulator& sim, int depth, float alpha, float beta, int player, bo
 	return best;
 }
 
+#ifdef STDAFX
 ///* gets the histogram of columns */
 void Board::getHist() {
 	for (int i = 1; i < 11; i++) {
@@ -891,11 +988,11 @@ public:
 
 float Individual::fitness() {
 	Board b;
-	u128 e;
+	u128 e = 0;
 	float count = 0;
 	uint8_t tStat[8] = {2, 2, 2, 2, 2, 2, 2, 2};
 	int i;
-	for (int j = 0; j < 1; j++) {
+	for (int j = 0; j < 5; j++) {
 		for (i = 0; i < 1E3; i++) {
 			// init
 			Simulator sim;
@@ -910,22 +1007,27 @@ float Individual::fitness() {
 				
 			}
 			int type = std::rand() % 7;
-			while (tStat[type] == 0) {
-				type = std::rand() % 7;
+			if (show) {
+				while (tStat[type] == 0) {
+					type = std::rand() % 7;
+				}
+				tStat[type]--;
 			}
-			tStat[type]--;
-			/*if (!show)
-				type = std::rand() % 7;*/
 
 			sim.nextBlock = Simulator::types[type];
 			if (!b.hasNext(sim.nextBlock))
 				break;
 			if (show)
-				negaMax(sim, 1, -FLT_MAX, FLT_MAX, -1, true) == -FLT_MAX;
+				negaMax(sim, 1, -FLT_MAX, FLT_MAX, -1, true);
 			else
-				negaMax(sim, 1, -FLT_MAX, FLT_MAX, -1, true) == -FLT_MAX;
+				negaMax(sim, 1, -FLT_MAX, FLT_MAX, -1, true);
 			u128 ori = b.wAr;
-			count += b.apply(b.wAr, sim.bestX, sim.bestY, static_cast<enum Board::TMO>(sim.bestB), e);
+			count = b.apply(b.wAr, sim.bestX, sim.bestY, static_cast<enum Board::TMO>(sim.bestB), e);
+			/*count = b.hist[1] + b.wAOfs;
+			for (int i = 2; i < 11; i++) {
+				count = b.hist[i] + b.wAOfs > count ? b.hist[i] + b.wAOfs : count;
+			}*/
+			fit += count;
 			if (show) {
 				print(ori);
 				print(b.wAr);
@@ -939,9 +1041,7 @@ float Individual::fitness() {
 			;
 		}
 	}
-	
-	fit += count;
-	return fit;
+	return fit / 5;
 }
 
 int cmp(const void *a, const void *b) {
@@ -952,13 +1052,13 @@ Individual GA() {
 	/*Individual a;
 	return a;*/
 	// population count
-	const int NUM = 500;
+	const int NUM = 300;
 	// survived count
-	const int surNum = 200;
+	const int surNum = 100;
 	// inheritance rate
 	float inhRate = 0.1;
 	// mutation rate
-	float mutRate = 0.05;
+	float mutRate = 0.01;
 
 	int iter = 0;
 
@@ -974,6 +1074,8 @@ Individual GA() {
 		for (int j = 0; j < 5; j++) {
 			time_t now = time(NULL);
 			for (int i = 0; i < NUM; i++) {
+
+
 				srand(now);
 				pop[i].show = false;
 
@@ -985,11 +1087,12 @@ Individual GA() {
 		std::qsort(pop, NUM, sizeof(pop[0]), cmp);
 
 		std::cout << "generation: " << iter << std::endl;
-		std::cout << "ave fitness: " << sumF / (float)NUM / 5.0 << std::endl;
+		std::cout << "ave fitness: " << sumF / (float)NUM / 25.0 << std::endl;
 		std::cout << "top fitnesses: " << std::endl;
 		for (int i = 0; i < 5; i++) {
 			std::cout << "\tfitness: " << pop[i].fit / 5.0 << 
-				"\tgene: " << pop[i].gene[0] << pop[i].gene[1] << pop[i].gene[2] << pop[i].gene[3] << std::endl;
+				"\tgene: " << pop[i].gene[0] << "f, " << pop[i].gene[1] << "f, " 
+				<< pop[i].gene[2] << "f, " << pop[i].gene[3] << "f, " << std::endl;
 		}
 
 		if (iter == 100)
@@ -1001,20 +1104,29 @@ Individual GA() {
 		Individual survived[surNum];
 		int survivedFit[surNum];
 		int surCount = 0;
-		for (int i = 0; i < NUM; i++) {
-			// full
-			if (surNum - 1 == surCount)
-				break;
+		for (int i = 0; i < surNum; i++) {
+			//// full
+			//if (surNum - 1 == surCount)
+			//	break;
 
-			// quadratic distribution
-			float f = i / (float)(NUM);
-			if (f > RDM)
-				continue;
-			//std::cout << i << std::endl;
-			survived[surCount] = pop[i];
-			survivedFit[surCount] = pop[i].fit;
-			newSumF += pop[i].fit;
-			surCount++;
+			//// quadratic distribution
+			//float f = i / (float)(NUM);
+			//if (f > RDM)
+			//	continue;
+			////std::cout << i << std::endl;
+			//survived[surCount] = pop[i];
+			//survivedFit[surCount] = pop[i].fit;
+			//newSumF += pop[i].fit;
+			//surCount++;
+			Individual a = pop[rand() % NUM];
+			Individual b = pop[rand() % NUM];
+			if (a.fit > b.fit) {
+				survived[i] = a;
+			}
+			else {
+				survived[i] = b;
+			}
+			newSumF += survived[i].fit;
 		}
 
 		Individual newPop[NUM];
@@ -1083,7 +1195,7 @@ Individual GA() {
 }
 
 void testGA(Individual ind) {
-	/*float a[4] = { 0.474636, 0.703883, 0.652735, 0.639012 };
+	/*float a[4] = { 0.35663f, 0.510066f, 0.184483f, 0.760666f, };
 	for (int i = 0; i < 4; i++) {
 		ind.gene[i] = a[i];
 	}*/
@@ -1092,52 +1204,246 @@ void testGA(Individual ind) {
 		std::cout << ind.fitness() / 5.0f << std::endl;
 	}
 	std::cout << ind.fit << std::endl;
-	srand(10);
+	//srand(10);
 	ind.show = true;
 	ind.fitness();
 }
+#endif
 
 class BotzoneGame {
-	Simulator me;
-	Simulator you;
+public:
+	// me = 0, you = 1
+	Simulator sim[2];
+	u128 elim[2] = { 0, 0 };
+	int elimCount[2] = { 0, 0 };
+
+	void useBlock(int color, int type);
+	void updatePlayer(int color, int x, int y, int o, int b);
+	void updateBlock(int color, int x, int y, int o, int b);
+	void updateElim(int color);
+	Board::TMO inputFit(int& x, int& y, int o, int b);
+	static const Board::TMO transitionTable[4][7];
+};
+const Board::TMO BotzoneGame::transitionTable[4][7] = {
+	{ Board::L0, Board::J0, Board::S0, Board::Z0, Board::T0, Board::I2, Board::O0, },
+	{ Board::L1, Board::J1, Board::S1, Board::Z1, Board::T1, Board::I3, Board::O0, },
+	{ Board::L2, Board::J2, Board::S0, Board::Z0, Board::T2, Board::I2, Board::O0, },
+	{ Board::L3, Board::J3, Board::S1, Board::Z1, Board::T3, Board::I3, Board::O0, },
 };
 
-int main() {
-	srand(time(NULL));
-	using std::cout;
-	using std::endl;
+/* feed the block to the player specified by color */
+void BotzoneGame::useBlock(int color, int type) {
+	Simulator& s = sim[color];
+	s.updateFeed(type);
+	s.nextBlock = Simulator::types[type];
+}
 
+/* place block */
+void BotzoneGame::updatePlayer(int color, int x, int y, int o, int b) {
+	Simulator& m = sim[color];
+	Simulator& e = sim[1 - color];
+
+	// get rid of offset
+	y -= m.board.wAOfs;
+	Board::TMO type = inputFit(x, y, o, b);
+
+	u128 elim = 0;
+	int elimCount = m.board.apply(m.board.wAr, x, y, type, elim);
+
+	if (!elimCount)
+		return;
+
+	// add to buffer & update offset
+	e.board.wAOfs += elimCount;
+	if (e.board.wAOfs > 10) {
+		int extra = e.board.wAOfs - 10;
+		e.board.wAOfs = 10;
+
+		// get top row mask
+		u128 mask = 0;
+		for (int i = extra; i > 0; i--)
+			mask |= Board::ROW[10 - i + 1];
+
+		e.board.wAr = ((e.board.wAr >> extra) | ((e.board.field & mask) >> (10 - extra))) & Board::HLF;
+		e.board.field = ((e.board.field >> elimCount) | elim) & Board::HLF;
+	}
+	else
+		e.board.field = ((e.board.field >> elimCount) | elim) & Board::HLF;
+}
+
+void BotzoneGame::updateBlock(int color, int x, int y, int o, int b) {
+	Simulator& m = sim[color];
+
+	// get rid of offset
+	y -= m.board.wAOfs;
+	Board::TMO type = inputFit(x, y, o, b);
+
+	elimCount[color] = m.board.apply(m.board.wAr, x, y, type, elim[color]);
+}
+
+void BotzoneGame::updateElim(int color) {
+	Simulator& e = sim[1 - color];
+
+	if (elimCount[color] == 0)
+		return;
+
+	// add to buffer & update offset
+	e.board.wAOfs += elimCount[color];
+	if (e.board.wAOfs > 10) {
+		int extra = e.board.wAOfs - 10;
+		e.board.wAOfs = 10;
+
+		// get top row mask
+		u128 mask = 0;
+		for (int i = extra; i > 0; i--)
+			mask |= Board::ROW[10 - i + 1];
+
+		e.board.wAr = ((e.board.wAr >> extra) | ((e.board.field & mask) << (10 - extra))) & Board::HLF;
+	}
+	e.board.field = ((e.board.field >> elimCount[color]) | elim[color]) & Board::HLF;
+	
+	elimCount[color] = 0;
+	elim[color] = 0;
+}
+
+Board::TMO BotzoneGame::inputFit(int& x, int & y, int o, int b) {
+	// S/Z
+	if (b == 2 || b == 3) {
+		if (o == 2)
+			y++;
+		else if (o == 3)
+			x--;
+	}
+
+	// I
+	if (b == 5) {
+		if (o == 0)
+			y++;
+		else if (o == 1)
+			x--;
+	}
+	
+	// o
+	if (b == 6) {
+		if (o == 1)
+			y--;
+		else if (o == 2)
+			x++, y--;
+		else if (o == 3)
+			x++;
+	}
+
+	return transitionTable[o][b];
+}
+
+int main() {
+	using std::cout;
+	using std::cin;
+	using std::endl;
+	using std::string;
+	using std::getline;
+
+#ifdef TRAIN
+	srand(time(NULL));
 	testGA(GA());
 	std::cin.get();
 	return 0;
+#endif // GA
 
-	Simulator me;
-	Simulator you;
 	///////////////////////////////////// update status
-	int x, y, block, ori;
-	Board::TMO type;
-	u128 elim;
-	///////////////////////////////////// update status
-	int elimCount = you.board.apply(you.board.wAr, x, y - you.board.wAOfs, type, elim);
+	BotzoneGame game;
+	//cin("1 6 1");
+	std::istream::sync_with_stdio(false);
+	int turnID, x, y, color, block, ori;
+	cin >> turnID >> block >> color;
 
-	// add to mine
-	me.board.wAr = (me.board.wAr << elimCount) | elim;
-	me.board.wAOfs += elimCount;
-	me.updateFeed(block);
+	/*string str = string("{\"requests\":[{\"block\":4,\"color\":1}],\"responses\":[]}");
+	getline(cin, str);
+	Json::Reader reader;
+	Json::Value input;
+	reader.parse(str, input);
+
+	turnID = input["responses"].size() + 1;
+	auto &first = input["requests"][(Json::UInt) 0];
+	block = first["block"].asInt();
+	color = first["color"].asInt();*/
+	
+	Board::TMO type = Simulator::types[block];
+	game.useBlock(0, block);
+	game.useBlock(1, block);
+
+	int myNext = block, yourNext = block;
+	int myPrev = block, yourPrev = block;
+	for (int i = 1; i < turnID; i++) {
+		cin >> yourNext >> x >> y >> ori;
+		/*auto &myOutput = input["responses"][i - 1];
+		block = myOutput["block"].asInt();
+		x = myOutput["x"].asInt();
+		y = myOutput["y"].asInt();
+		ori = myOutput["o"].asInt();*/
+
+		//game.updatePlayer(0, x, y, ori, myPrev);
+		game.updateBlock(0, x, y, ori, myPrev);
+		game.useBlock(1, yourNext);
+		
+
+		cin >> myNext >> x >> y >> ori;
+		/*myOutput = input["responses"][i];
+		block = myOutput["block"].asInt();
+		x = myOutput["x"].asInt();
+		y = myOutput["y"].asInt();
+		ori = myOutput["o"].asInt();*/
+
+		//game.updatePlayer(1, x, y, ori, yourPrev);
+		game.updateBlock(1, x, y, ori, yourPrev);
+		game.useBlock(0, myNext);
+
+		game.updateElim(0);
+		game.updateElim(1);
+		game.sim[0].board.load();
+		game.sim[1].board.load();
+		yourPrev = yourNext;
+		myPrev = myNext;
+#ifdef DEBUG
+		cout << i << " " << i << " " << i << " " << i << " " << i << " " << i << " " << i << " " << endl;
+		cout << "MYMYMYMYMYMYMYMYMYMYMYMYMYMY" << endl;
+		print(game.sim[0].board.wAr);
+		std::cout << (int)game.sim[0].board.wAOfs << "+";
+		for (int i = 1; i < 11; i++)
+			std::cout << "  " << (int)game.sim[0].board.hist[i];
+		std::cout << std::endl;
+		print(game.sim[0].board.field);
+
+		cout << "UUUUUUUUUUUUUUUUUUUUUUUUUUUU" << endl;
+		print(game.sim[1].board.wAr);
+		std::cout << (int)game.sim[1].board.wAOfs << "+";
+		for (int i = 1; i < 11; i++)
+			std::cout << "  " << (int)game.sim[1].board.hist[i];
+		std::cout << std::endl;
+		print(game.sim[1].board.field);
+#endif // DEBUG
+	}
+	///////////////////////////////////// update status
 
 	// make decision
-	negaMax(me, 1, -FLT_MAX, FLT_MAX, -1, true) == -FLT_MAX;
-	x = me.bestX;
-	y = me.bestY;
-	ori;
-	negaMax(you, 4, -FLT_MAX, FLT_MAX, -1, true) == -FLT_MAX;
-	block = you.bestB;
+	negaMax(game.sim[0], 1, -FLT_MAX, FLT_MAX, -1, true);
+	x = game.sim[0].bestX;
+	y = game.sim[0].bestY + game.sim[0].board.wAOfs;
+	const int oriTable[19] = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 0 };
+	ori = oriTable[game.sim[0].bestB];
 
-	elimCount = me.board.apply(me.board.wAr, x, y - me.board.wAOfs, type, elim);
+	negaMax(game.sim[1], 4, -FLT_MAX, FLT_MAX, 1, true);
+	const int blkTable[19] = { 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6 };
+	block = blkTable[game.sim[1].bestB];
 
-	// add to yours
-	you.board.wAr = (you.board.wAr << elimCount) | elim;
-	you.board.wAOfs += elimCount;
-	you.updateFeed(block);
+	cout << block << " " << x << " " << y << " " << ori;
+
+	/*Json::Value output;
+	Json::FastWriter writer;
+	output["response"]["block"] = block;
+	output["response"]["x"] = x;
+	output["response"]["y"] = y;
+	output["response"]["o"] = ori;
+	cout << writer.write(output);*/
 }
 
